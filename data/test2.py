@@ -3,7 +3,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from tools import *
-from scipy.optimize import minimize
+import scipy.optimize as s
 from random import gauss
 
 #Bloc génération de données artificielles de dimension 2
@@ -148,6 +148,7 @@ def calcule_bi(beta, Y):
 
 def gradient_modele(X, mu, w, l):
     N=np.shape(X)
+    w = w.reshape((w.shape[0],1))
     (d,p)=np.shape(w)
     vecteur_grad = np.zeros((d,1))
     vecteur_w_x = sigmoide(np.dot(X,w))
@@ -157,17 +158,44 @@ def gradient_modele(X, mu, w, l):
     vecteur_res=vecteur_res.reshape((d,1))
     return vecteur_res - 2 * w
 
-def hessien_modele(X,w,l):
+def hessien_modele(X,w, l):
     N=X.shape[0]
     d = w.shape[0]
     vecteur_w_x = sigmoide(np.dot(X,w))
     Matrice_Hessienne=np.zeros((d,d))
     H = np.multiply(np.multiply(vecteur_w_x,(1-vecteur_w_x)),X).T.dot(X)
-    return H - 2 * np.eye(d)
+    return H - 2* np.eye(d)
     # for i in range(N):
     #     xi=X[i,:].reshape((d,1))
     #     Matrice_Hessienne -= vecteur_w_x[i,0]*(1-vecteur_w_x[i,0])*np.dot(xi,xi.T)
     # return Matrice_Hessienne
+
+def likelihood(X, Y, alpha, beta, w, vrai_y, lb):
+    # vrai_y = mu_i
+
+    N = X.shape[0]
+    T = Y.shape[1]
+
+    p_i = 1/(1+np.exp(-X.dot(w)))+1.0**(-10)
+    p_i = p_i.reshape((N,1))
+    a_i = calcule_ai(alpha, Y)
+    b_i = calcule_bi(alpha, Y)
+
+    log_pi = np.log(p_i)
+    log_un_pi = np.log(1-p_i)
+    vrai_un_yi = (1-vrai_y)
+
+    a1 = np.multiply(a_i, log_pi)
+    a1 = np.multiply(a1, vrai_y)
+
+    b1 = np.multiply(b_i, log_un_pi)
+    b1 = np.multiply(b1, vrai_un_yi)
+
+    log_res = np.sum(a1+b1)
+
+    return log_res - lb * np.linalg.norm(w)
+
+
 
 class LearnCrowd2:
     def __init__(self, T, N, d, l=0):
@@ -198,23 +226,22 @@ class LearnCrowd2:
         b1 = np.multiply(b_i, log_un_pi)
         b1 = np.multiply(b1, vrai_un_yi)
 
-        log_res = np.sum(a1+b1)
+        log_res = np.sum(a1 + b1)
 
-        return log_res - self.lb * np.linalg.norm(self.w)
+        return log_res - self.lb * np.linalg.norm(w)
 
-    def fit(self, X, Y, model="Bernoulli", eps = 10**(-3)):
+    def fit(self, X, Y, model="Bernoulli", eps = 10**(-5)):
         N = X.shape[0]
         d = X.shape[1]
         T = Y.shape[1]
 
         #EM Algorithm
-
         #Initialization
 
-        alpha=np.ones((1,T))
-        alphaNew=0.5*np.ones((1,T))
-        beta=np.ones((1,T))
-        betaNew=0.5*np.ones((1,T))
+        alpha = np.zeros((1,T))
+        alphaNew = np.ones((1,T))
+        beta = np.zeros((1,T))
+        betaNew = np.ones((1,T))
         #initialisation des mu avec le majority voting
         mu_inter=(np.sum(Y,axis=1)/T)
 
@@ -227,7 +254,7 @@ class LearnCrowd2:
         # self.norme_gradient=[]
         # valeur_EM_before=1
         # valeur_EM=1000
-        while (np.linalg.norm(alpha-alphaNew)**2 + np.linalg.norm(beta-betaNew)**2 >= eps and (cpt_iter<100)):
+        while (np.linalg.norm(alpha-alphaNew)**2 + np.linalg.norm(beta-betaNew)**2 >= eps and (cpt_iter<300)):
         #while(abs((valeur_EM-valeur_EM_before)/valeur_EM_before)>=eps and (cpt_iter<=1000)):
 
             print("ITERATION N°",cpt_iter)
@@ -235,9 +262,8 @@ class LearnCrowd2:
 
             alpha = alphaNew
             beta= betaNew
-
-
             valeur_EM = self.likelihood(X,Y,alphaNew,betaNew,w,mu)
+
             # Expectation (E-step)
             if(cpt_iter!=0):
                     # self.liste_em.append(valeur_EM)
@@ -251,9 +277,7 @@ class LearnCrowd2:
                     #     mu[i,0] = ai*pi/(ai*pi+bi*(1-pi))
                     ai = calcule_ai(alphaNew, Y)
                     bi = calcule_bi(betaNew, Y)
-
                     mu = np.multiply(ai, pi) / (ai * pi + bi * (1-pi))
-
 
             cpt_iter+=1
             # Maximization (M-step)
@@ -262,8 +286,8 @@ class LearnCrowd2:
             alpha_inter = np.dot(Y.T, mu) / ((np.sum(mu)) + 1.0**(-10))
             alphaNew=alpha_inter.reshape((1,T))
             #calcul de beta
-            mu_inter = 1-mu
-            y_inter = np.ones((N,T))-Y
+            mu_inter = 1 - mu
+            y_inter = np.ones((N,T)) - Y
             beta_inter = np.dot(y_inter.T,mu_inter) / ((np.sum(mu_inter))+1.0**(-10))
             betaNew = beta_inter.reshape((1,T))
 
@@ -272,17 +296,15 @@ class LearnCrowd2:
             Hess_w = hessien_modele(X,w, self.lb)
 
             #boucle de travail
-            w_avant = w
             if np.linalg.det(Hess_w) != 0:
                 matrice_inverse = np.linalg.inv(Hess_w)
                 w = w - np.dot(matrice_inverse,grad_w_avant)
             else:
                 w = w - 0.5 * grad_w_avant
 
-            print("Trouver le vecteur w : \n")
             norme_gradient = np.linalg.norm(grad_w_avant)
             iter_W = 0
-            while(norme_gradient>eps and (iter_W<200)):
+            while(norme_gradient>10**(-6) and (iter_W<500)):
                 grad_w = gradient_modele(X,mu,w, self.lb)
                 Hess_w = hessien_modele(X,w, self.lb)
                 if np.linalg.det(Hess_w) != 0:
@@ -293,13 +315,11 @@ class LearnCrowd2:
 
                 norme_gradient=np.linalg.norm(grad_w)
                 iter_W += 1
-            print("W TROUVE !")
+            print("w found \n")
 
         self.alpha = alphaNew
         self.beta = betaNew
         self.w = w
-        print("valeur de w")
-        print(w)
         #
         # plt.plot(nombre_iteration[2:],self.liste_em)
         # plt.show()
@@ -314,13 +334,6 @@ class LearnCrowd2:
         return labels_predicted.ravel()
 
 
-
-
-    def score(self, X, Z):
-        # On connaît la vérité terrain
-        return np.mean(self.predict(X)==Z)
-
-
     def debug(self):
         print("w : \n")
         print(self.w)
@@ -328,6 +341,14 @@ class LearnCrowd2:
         print(self.alpha)
         print("beta : \n")
         print(self.beta)
+
+    def score(self, X, Z):
+        # On connaît la vérité terrain
+        return np.mean(self.predict(X)==Z)
+
+
+
+
 
 def LearnfromtheCrowd2(N,T, d, modele,qualite_annotateurs, generateur,noise_truth=0):
     print("Rappel des paramètres")
@@ -374,7 +395,7 @@ def LearnfromtheCrowd2(N,T, d, modele,qualite_annotateurs, generateur,noise_trut
     # print("Performances sur les données d'entrainement : ")
     print("Score en Train : ", S.score(xtrain,ztrain))
     print("")
-
+    S.debug()
     #plot_frontiere(xtest,S.predict(xtest),step=50) C'est XTEST ? Pas ZTEST ?
     # plot_data(xtrain,S.predict(xtrain))
     # plt.title("Prédictions finales sur le Train après crowdlearning")
@@ -388,69 +409,10 @@ def LearnfromtheCrowd2(N,T, d, modele,qualite_annotateurs, generateur,noise_trut
     # plt.show()
 
 N = 100 #nb données
-T = 5 #nb annotateurs
+T = 10 #nb annotateurs
 d = 2 #nb dimension des données : pas modifiable (gen_arti ne génère que des données de dimension 2)
 noise_truth=0.1 #bruit sur l'attribution des vrais labels gaussiens sur les données 2D (on pourrait aussi jouer sur ecart-type gaussienne avec sigma)
 modele= "Bernoulli"
 qualite_annoteur = [(0.6,0.6)]*T
 
-# Test données artificielles :
-
 LearnfromtheCrowd2(N,T,d,modele,qualite_annoteur,generation_Bernouilli,noise_truth)
-
-
-# Données réelles :
-
-def load_XZ(filename):
-    with open(filename,"r") as f:
-        f.readline()
-        data =[ [x for x in l.split()] for l in f if len(l.split())>2]
-    X = np.array(data)
-    return X[:,:X.shape[1]-1], (X[:,X.shape[1]-1].astype(int)+1)/2
-
-def load_Y(filename):
-    with open(filename,"r") as f:
-        f.readline()
-        data =[ [x for x in l.split()] for l in f if len(l.split())>2]
-    X = np.array(data)
-    return X[:,:X.shape[1]-1].astype(int)
-
-
-def genereWithoutMissing(Xmissing,Ymissing):
-    X = []
-    Y = []
-    for i in range(Xmissing.shape[0]):
-        if not '?' in Xmissing[i]:
-            X.append(Xmissing[i])
-            Y.append(Ymissing[i])
-    return np.array(X).astype(int), (np.array(Y).astype(int)+1)/2
-
-X,Z = load_XZ('data/dataXZ_Adult.txt')
-
-Y = load_Y('data/dataY_Adult.txt')
-
-XX,YY = genereWithoutMissing(X,Y)
-
-sliceTrain = int(XX.shape[0]*0.8)
-xtrain, ytrain,ztrain = XX[0:sliceTrain,:], YY[0:sliceTrain,:], Z[0:sliceTrain]
-xtest, ytest,ztest = XX[sliceTrain+1:,:], YY[sliceTrain+1:,:], Z[sliceTrain+1:]
-xtrain = np.delete(xtrain,2,axis=1)
-xtest = np.delete(xtest,2,axis=1)
-
-xtrain = (xtrain - np.mean(xtrain)) / np.std(xtrain)
-xtest = (xtest - np.mean(xtest)) / np.std(xtest)
-
-T = YY.shape[1]
-N = XX.shape[0]
-d = XX.shape[1]
-S = LearnCrowd2(T,N,d,0.)
-
-print("Apprentissage")
-S.fit(xtrain,ytrain)
-
-print("Performances sur les données d'entrainement : ")
-print("Score en Train : ", S.score(xtrain,ztrain))
-print("")
-
-print("Performances sur les données de test : ")
-print("Score en Test : ", S.score(xtest,ztest))
