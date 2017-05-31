@@ -102,7 +102,7 @@ def generation_Bernoulli(N,T,qualite_annotateur_Bernoulli,noise_truth):
     """retourne en xtrain les données de dimension 2, en ytrain les annotations, en ztrain les vrais labels
     avec pour qualite_annotateurs une liste contenant les probabilités de succès de chaque annotateur
     noise_truth est le bruit de l'attribution des vrais labels gaussiens sur les données"""
-    xtrain,ztrain = gen_arti(nbex=N,data_type=1,epsilon=noise_truth) #vrai labels non bruités
+    xtrain,ztrain = gen_arti(nbex=N,data_type=0,epsilon=noise_truth) #vrai labels non bruités
     ztrain=(ztrain+1)/2
     ytrain=np.zeros((N,T)) #changement des labels
     for t in range(T):
@@ -112,22 +112,21 @@ def generation_Bernoulli(N,T,qualite_annotateur_Bernoulli,noise_truth):
     return xtrain,ytrain,ztrain
 
 def modifie_label_Bernoulli_xdepend(data,label,proba):
-    """modifie le vrai label en choisissant l'autre avec une probabilité 1-proba (dans la zone 1)
-    et proba (dans la zone 2)"""
+    """modifie le vrai label en choisissant l'autre avec une probabilité proba[0] (dans la zone 1)
+    et proba[1] (dans la zone 2)"""
     valeur_proba=np.random.uniform(0,1)
     label_res=label
     if data[0]>=0: #donnees à x négatif (groupe 1 de données)
-        if(valeur_proba>=proba):
+        if(valeur_proba>=proba[0]):
            label_res=1-label
     else: #données à x positif (groupe 2 de données)
-        if(valeur_proba>=1-proba):
+        if(valeur_proba>=proba[1]):
            label_res=1-label
     return label_res
 
 def generation_Bernoulli_xdepend(N,T,qualite_annotateur_Bernoulli,noise_truth):
     """retourne en xtrain les données de dimension 2, en ytrain les annotations, en ztrain les vrais labels
-    avec pour qualite_annotateur_Bernoulli les probabilités de succès de chaque annotateur dans la zone  1 de
-    données (proba dans l'autre zone : 1-qualite_annotateur_Bernoulli)"""
+    avec pour qualite_annotateur_Bernoulli les probabilités de succès de chaque annotateur dans chaque zone"""
     xtrain,ztrain = gen_arti(nbex=N,data_type=0,epsilon=noise_truth) #vrai labels non bruités
     ztrain=(ztrain+1)/2
     ytrain=np.zeros((N,T)) #changement des labels
@@ -167,6 +166,11 @@ def generation_Gaussian(N,T,qualite_annotateur_gaussien,noise_truth):
     idx = np.random.permutation(range(len(tmpy)))
     return tmpx[idx,:],tmpy[idx]'''
 
+def traite_zero(x):
+    if x==0:
+        return 1
+    else:
+        return x
 
 class LearnCrowd:
     def __init__(self, T, N, d):
@@ -201,12 +205,35 @@ class LearnCrowd:
         for t in range(T):
           y_cond_z[:,t,0] = ((1-eta[:,t])**np.abs(Y[:,t]))*(eta[:,t]**(1-np.abs(Y[:,t])))
           y_cond_z[:,t,1] = ((1-eta[:,t])**np.abs(Y[:,t]-1))*(eta[:,t]**(1-np.abs(Y[:,t]-1)))
+          '''
+          sum = y_cond_z[:,t,0] + y_cond_z[:,t,1]
+          traite = lambda x:traite_zero(x)
+          traite = np.vectorize(traite)
+          sum = traite(sum)
+          y_cond_z[:,t,0] = np.multiply(y_cond_z[:,t,0],1/sum)
+          y_cond_z[:,t,1] = np.multiply(y_cond_z[:,t,1],1/sum)
+          print(y_cond_z)
+          '''
+          #print(y_cond_z[:,t,:])
 
         #hyp de base que l'on pourra prendre pour simplifier neta[i,t]=rlog(i,t)=neta[t]
         #cet hyp revient à donner une proba constante de se tromper pour le labelleur t quelque soit la donnée
         #il faudrait alors rajouter un self.neta=np.zeros(1,T) au init pour le modèle de Bernoulli
 
-        return np.multiply(np.prod(y_cond_z,axis=1),self.z_cond_x(X, alpha, beta))
+        #print(self.z_cond_x(X, alpha, beta))
+
+        results = np.multiply(np.prod(y_cond_z,axis=1),self.z_cond_x(X, alpha, beta))
+
+        sum = results[:,0] + results[:,1]
+        traite = lambda x:traite_zero(x)
+        traite = np.vectorize(traite)
+        sum = traite(sum)
+        results[:,0] = np.multiply(results[:,0],1/sum)
+        results[:,1] = np.multiply(results[:,1],1/sum)
+        #print("R")
+        #print(results)
+
+        return results
 
     def expects_labels_Gaussian(self, X, Y, alpha, beta, gamma, w):
         """calcule les probas des labels z pour chaque donnée -> taille (N,2)
@@ -525,8 +552,8 @@ class MajorityVoting:
         predictions = np.sum(Y,axis=1)/T
         predictions = predictions > seuil
         return predictions
-    def score(self, Y, Z):
-        return np.mean(self.predict(Y)==Z)
+    def score(self, Y, Z,seuil):
+        return np.mean(self.predict(Y,seuil)==Z)
 
 def TP_FP(predictions,truth):
     tmp1 = (predictions==1)&(truth==1);
@@ -536,6 +563,10 @@ def TP_FP(predictions,truth):
     return TP,FP
 
 def trace_ROC(N,T,d,modele,qualite_annotateurs,generateur,noise_truth):
+    """ trace les courbes ROC pour le modèle learning from the Crowd avec predict(X),
+    compare avec un classifieur sur Z, compare avec un majority voting,
+    place aussi les FP et TP de chaque labelleur // ground truth"""
+
     print("Rappel des paramètres")
     print("Nombre de données générées : ", N)
     print("Nombre de dimensions des données générées : ", d)
@@ -554,11 +585,11 @@ def trace_ROC(N,T,d,modele,qualite_annotateurs,generateur,noise_truth):
     #     print("Vrai Labels : ", ztrain)
     #     print("Labels données par les annotateurs Y : ", ytrain)
     #     print("")
-    print("ytrain size :", ytrain.shape)
-    print("xtrain size :", xtrain.shape)
-    plot_data(xtrain,ztrain)
-    plt.title("Données et labels de départ (bruitées)")
-    plt.show()
+    #print("ytrain size :", ytrain.shape)
+    #print("xtrain size :", xtrain.shape)
+    #plot_data(xtrain,ztrain)
+    #plt.title("Données et labels de départ (bruitées)")
+    #plt.show()
 
     if modele=="Bernoulli":
         print(ytrain[:,0])
@@ -566,7 +597,23 @@ def trace_ROC(N,T,d,modele,qualite_annotateurs,generateur,noise_truth):
         plt.title("Annotations d'un labelleur")
         plt.show()
 
-    print("Données de test")
+    #print("TP et FP de chaque annotateur")
+    TP_train_labelleurs=[]
+    FP_train_labelleurs=[]
+    for t in range(T):
+        tp,fp = TP_FP(ytrain[:,t],ztrain)
+        TP_train_labelleurs.append(tp)
+        FP_train_labelleurs.append(fp)
+
+    #print("TP et FP de chaque annotateur")
+    TP_test_labelleurs=[]
+    FP_test_labelleurs=[]
+    for t in range(T):
+        tp,fp = TP_FP(ytest[:,t],ztest)
+        TP_test_labelleurs.append(tp)
+        FP_test_labelleurs.append(fp)
+
+    #print("Données de test")
     '''print("Données X : ", xtest)
     print("Vrai Labels : ", ztest)
     #print("Labels données par les annotateurs Y : ", ytest)
@@ -622,12 +669,14 @@ def trace_ROC(N,T,d,modele,qualite_annotateurs,generateur,noise_truth):
         TP_test_class.append(tp)
         FP_test_class.append(fp)
 
+    plt.scatter(FP_train_labelleurs,TP_train_labelleurs)
     plt.plot(FP_train_crowd,TP_train_crowd,color="blue")
     plt.plot(FP_train_majority,TP_train_majority,color="red")
     plt.plot(FP_train_class,TP_train_class,color="yellow")
     plt.title("ROC trainset crowdlearning (bleu), majority voting (rouge), classifier truth (yellow)")
     plt.show()
 
+    plt.scatter(FP_test_labelleurs,TP_test_labelleurs)
     plt.plot(FP_test_crowd,TP_test_crowd,color="blue")
     plt.plot(FP_test_majority,TP_test_majority,color="red")
     plt.plot(FP_test_class,TP_test_class,color="yellow")
@@ -654,6 +703,7 @@ def LearnfromtheCrowd(N,T, d, modele,qualite_annotateurs, generateur,noise_truth
     xtrain, ytrain,ztrain = generateur(N,T,qualite_annotateurs,noise_truth)
     #xtest, ytest,ztest = generateur(N,T,qualite_annotateurs,noise_truth)
 
+    '''
     print("Données d'entrainement")
     print("Données X : ", xtrain)
     print("Vrai Labels : ", ztrain)
@@ -664,6 +714,7 @@ def LearnfromtheCrowd(N,T, d, modele,qualite_annotateurs, generateur,noise_truth
     plot_data(xtrain,ztrain)
     plt.title("Données et labels de départ (bruitées)")
     plt.show()
+    '''
 
     if modele=="Bernoulli":
         plot_data(xtrain,ytrain[:,0])
@@ -691,8 +742,8 @@ def LearnfromtheCrowd(N,T, d, modele,qualite_annotateurs, generateur,noise_truth
     print("Test à l'aide de X")
 
     print("Performances sur les données d'entrainement : ")
-    print("Score en Train : ", S.score(xtrain,ztrain,0.5))
-    print("")
+    strain=S.score(xtrain,ztrain,0.5)
+    print("Score en Train : ",strain)
 
     #plot_frontiere(xtest,S.predict(xtest),step=50) C'est XTEST ? Pas ZTEST ?
     plot_data(xtrain,S.predict(xtrain,0.5))
@@ -700,14 +751,37 @@ def LearnfromtheCrowd(N,T, d, modele,qualite_annotateurs, generateur,noise_truth
     plt.show()
 
     '''
-    print("Performances sur les données de test : ")
-    print("Score en Test : ", S.score(xtest,ztest,0.5))
+    stest=S.score(xtest,ztest,0.5)
+    print("Performances sur les données de test : ")<&
+    print("Score en Test : ", stest)
 
     #plot_frontiere(xtest,S.predict(xtest),step=50)
     plot_data(xtest,S.predict(xtest,0.5))
     plt.title("Prédictions finales sur le Test après crowdlearning")
     plt.show()
+    '''
 
+    M=MajorityVoting()
+
+    strain_majority=M.score(ytrain,ztrain,0.5)
+    print("Score en Train (Majority Voting) : ", strain_majority)
+    print("")
+
+    plot_data(xtrain,M.predict(ytrain,0.5))
+    plt.title("Prédictions finales sur le Train après MajorityVoting")
+    plt.show()
+
+    '''
+    stest_majority= M.score(ytest,ztest)
+    print("Performances sur les données de test : ")
+    print("Score en Test (Majority Voting) : ", stest_majority)
+
+    plot_data(xtest,M.predict(ytest))
+    plt.title("Prédictions finales sur le Test après MajorityVoting")
+    plt.show()
+    '''
+
+    '''
     print("####################################################")
     print("Test à l'aide de X et Y")
 
@@ -724,13 +798,13 @@ def LearnfromtheCrowd(N,T, d, modele,qualite_annotateurs, generateur,noise_truth
     print("Score en Test : ", S.scoreV3(xtest,ytest,ztest,0.5,modele))
 
     plot_data(xtest,S.predictV3(xtest,ytest,0.5,modele))
-    plt.title("Prédictions finales sur le Test")
     plt.show()
-    
+
 
     print("####################################################")
 
     M=MajorityVoting()
+    plt.title("Prédictions finales sur le Test")
 
     print("Test à l'aide de Y, Comparaison avec le Majority Voting")
 
@@ -762,19 +836,57 @@ def LearnfromtheCrowd(N,T, d, modele,qualite_annotateurs, generateur,noise_truth
     plt.show()
     '''
 
-N = 16 #nb données
-T = 3 #nb annotateurs
-d = 2 #nb dimension des données : pas modifiable (gen_arti ne génère que des données de dimension 2)
-noise_truth=0 #bruit sur l'attribution des vrais labels gaussiens sur les données 2D (on pourrait aussi jouer sur ecart-type gaussienne avec sigma)
-modele= "Bernoulli"
+    return strain,strain_majority
+    #stest,stest_majority
 
-qualite_annotateurs_Bernoulli=[0.9,0.6,0.5] #Proba que l'annotateur ait raison
-LearnfromtheCrowd(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth)
+def learn_cas_unif_x():
+    N = 50 #nb données
+    T = 3 #nb annotateurs
+    d = 2 #nb dimension des données : pas modifiable (gen_arti ne génère que des données de dimension 2)
+    noise_truth=0 #bruit sur l'attribution des vrais labels gaussiens sur les données 2D (on pourrait aussi jouer sur ecart-type gaussienne avec sigma)
+    modele= "Bernoulli"
 
-#qualite_annotateurs_Bernoulli=[0.1] #Proba que l'annotateur ait raison dans la zone 1 de données (1-la valeur dans la zone 2)
-#LearnfromtheCrowd(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli_xdepend,noise_truth)
+    qualite_annotateurs_Bernoulli=[1.,1.,1.] #Proba que l'annotateur ait raison
+    LearnfromtheCrowd(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth)
 
-#trace_ROC(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth)
+    #qualite_annotateurs_Bernoulli=[0.1] #Proba que l'annotateur ait raison dans la zone 1 de données (1-la valeur dans la zone 2)
+    #LearnfromtheCrowd(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli_xdepend,noise_truth)
+
+    #trace_ROC(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth)
+
+learn_cas_unif_x()
+
+def learn_cas_depend_x():
+
+    special_params=[0.1*i for i in range(6)]
+    score_train_crowd=[]
+    score_train_majority=[]
+    #score_test_crowd=[]
+    #score_test_majority=[]
+
+    N = 100 #nb données
+    T = 3 #nb annotateurs
+    d = 2 #nb dimension des données : pas modifiable (gen_arti ne génère que des données de dimension 2)
+    noise_truth=0 #bruit sur l'attribution des vrais labels gaussiens sur les données 2D (on pourrait aussi jouer sur ecart-type gaussienne avec sigma)
+    modele= "Bernoulli"
+
+    #qualite_annotateurs_Bernoulli=[0.9,0.6,0.6] #Proba que l'annotateur ait raison
+    #LearnfromtheCrowd(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth)
+
+    for s in special_params:
+        qualite_annotateurs_Bernoulli=[[0.5+special_params,1-special_params],[1-special_params,0.5 + special_params],[0.5+special_params,0.5+special_params]] #Proba que l'annotateur ait raison dans la zone 1 de données (1-la valeur dans la zone 2)
+        scores = LearnfromtheCrowd(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli_xdepend,noise_truth)
+        score_train_crowd.append(score[0])
+        score_train_majority.append(score[1])
+
+    plt.plot(special_params,score_train_crowd)
+    plt.plot(special_params,score_train_majority)
+    plt.title("Performances entre annotateurs spécialisés et annotateurs non spécialisés")
+    plt.show()
+    #trace_ROC(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth)
+
+
+#learn_cas_depend_x()
 
 def courbe_precision_annoteur(nombre_annoteur):
     M=MajorityVoting()
@@ -792,6 +904,7 @@ def courbe_precision_annoteur(nombre_annoteur):
     plt.plot(vecteur_x,vecteur_y_crowd)
     plt.plot(vecteur_x,vecteur_y_crowd)
     plt.show()
+
 
 
 #courbe_precision_annoteur(100)1
