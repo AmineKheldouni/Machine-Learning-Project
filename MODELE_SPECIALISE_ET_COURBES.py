@@ -220,14 +220,12 @@ class LearnCrowd:
         #print("B",self.z_cond_x(X, alpha, beta))
         results = np.multiply(np.prod(y_cond_z,axis=1),self.z_cond_x(X, alpha, beta))
 
-        sum = results[:,0] + results[:,1]
+        s = results[:,0] + results[:,1]
         traite = lambda x:traite_zero(x)
         traite = np.vectorize(traite)
-        sum = traite(sum)
-        results[:,0] = np.multiply(results[:,0],1/sum)
-        results[:,1] = np.multiply(results[:,1],1/sum)
-        #print("R")
-        #print(results)
+        s = traite(s)
+        results[:,0] = np.multiply(results[:,0],1/s)
+        results[:,1] = np.multiply(results[:,1],1/s)
 
         return results
 
@@ -286,22 +284,21 @@ class LearnCrowd:
         (N,T)=np.shape(Y)
         grad_etasigma_w = np.zeros((N,d,T))
         for t in range(0,T):
-            grad_etasigma_w[:,:,t]=grad_etasigma_gamma[:,t].reshape(N,1)*X #taille N,d,T
+            grad_etasigma_w[:,:,t]=np.multiply(grad_etasigma_gamma[:,t].reshape(N,1),X) #taille N,d,T
 
         #if (model=="Bernoulli"):
-        grad_lh_etasigma = - deltaPt * ((-1)**Y) # Taille : N,T
+        grad_lh_etasigma = - np.multiply(deltaPt,((-1)**Y)) # Taille : N,T
         #elif (model=="Gaussian"):
         #grad_lh_etasigma = (Y**2-Pt[:,0]*(2*Y-1))/(etasigma**3) - 1/etasigma # Taille : N,T
 
         grad_lh_gamma = np.sum(np.multiply(grad_lh_etasigma,grad_etasigma_gamma),axis=0) #Taille 1,T
-        grad_lh_w = np.sum(np.multiply(np.repeat(grad_lh_etasigma[:,np.newaxis,:],d,axis=1),grad_etasigma_w),axis=0) #Taille d,T
-
+        grad_lh_w =  np.sum(np.multiply(np.repeat(grad_lh_etasigma[:,np.newaxis,:],d,axis=1),grad_etasigma_w),axis=0) #Taille d,T
+        
         # "Zippage" des gradients en un grand vecteur
         Grad = np.concatenate((grad_lh_alpha.ravel(),np.array([grad_lh_beta]).ravel(),grad_lh_gamma.ravel(),grad_lh_w.ravel()),axis=0)
-
         return Grad.ravel()
 
-    def fit(self, X, Y, model="Bernoulli", eps = 10**(-2)):
+    def fit(self, X, Y, model="Bernoulli", eps = 10**(-5)):
         N = X.shape[0]
         d = X.shape[1]
         T = Y.shape[1]
@@ -320,8 +317,12 @@ class LearnCrowd:
         gammaNew = np.random.rand(1,T)
 
         cpt_iter=0
+        LH = []
+        #if model=="Bernoulli":
+        Pt = self.expects_labels_Bernoulli(X, Y, self.alpha, self.beta, self.gamma, self.w)
+        normGrad = np.linalg.norm(-self.grad_likelihood(Pt, X, Y, model, self.alpha, self.beta, self.gamma, self.w))
 
-        while (np.linalg.norm(self.alpha-alphaNew)**2 + (self.beta-betaNew)**2 >= eps):
+        while (np.linalg.norm(self.alpha-alphaNew)**2 + (self.beta-betaNew)**2 >= eps or cpt_iter < 10):
             print("NORM",np.linalg.norm(self.alpha-alphaNew)**2 + (self.beta-betaNew)**2 )
             cpt_iter+=1
             print("ITERATION N°",cpt_iter)
@@ -330,6 +331,7 @@ class LearnCrowd:
             self.beta = betaNew
             self.gamma = gammaNew
             self.w = wNew
+            normGrad = np.linalg.norm(-self.grad_likelihood(Pt, X, Y, model, self.alpha, self.beta, self.gamma, self.w))
 
             #print(self.alpha,self.beta,self.gamma,self.w)
 
@@ -347,21 +349,21 @@ class LearnCrowd:
 
             def BFGSfunc(vect):
                 #print("Vect",vect)
-                print("Vraissemblance",-self.likelihood(Pt, X, Y, model, vect[0:d].reshape((1,d)), float(vect[d:d+1]), vect[d+1:d+1+T].reshape((1,T)), vect[d+1+T:d+1+T+d*T].reshape((d,T))))
+                # print("Vraisemblance : ",-self.likelihood(Pt, X, Y, model, vect[0:d].reshape((1,d)), float(vect[d:d+1]), vect[d+1:d+1+T].reshape((1,T)), vect[d+1+T:d+1+T+d*T].reshape((d,T))))
                 return -self.likelihood(Pt, X, Y, model, vect[0:d].reshape((1,d)), float(vect[d:d+1]), vect[d+1:d+1+T].reshape((1,T)), vect[d+1+T:d+1+T+d*T].reshape((d,T)))
 
             def BFGSJac(vect):
                 #print("Gradient",-self.grad_likelihood(Pt, X, Y, model, vect[0:d].reshape((1,d)), float(vect[d:d+1]), vect[d+1:d+1+T].reshape((1,T)), vect[d+1+T:d+1+T+d*T].reshape((d,T))))
                 return -self.grad_likelihood(Pt, X, Y, model, vect[0:d].reshape((1,d)), float(vect[d:d+1]), vect[d+1:d+1+T].reshape((1,T)), vect[d+1+T:d+1+T+d*T].reshape((d,T)))
 
-            Teta_init = np.concatenate((self.alpha.ravel(),np.array([self.beta]).ravel(),self.gamma.ravel(),self.w.ravel()),axis=0) #initial guess
-
+            Teta_init = np.concatenate((alphaNew.ravel(),np.array([betaNew]).ravel(),gammaNew.ravel(),wNew.ravel()),axis=0) #initial guess
             #rappels des tailles de alpha, beta, gamma, w : (1,d), 1, (1,T), (d,T)
+            LH.append(BFGSfunc(Teta_init))
             result = minimize(BFGSfunc, Teta_init, method='BFGS', jac = BFGSJac,\
-                              options={'gtol': 1e-6, 'disp': True, 'maxiter': 2000})
+                              options={'gtol': 1e-10, 'disp': True, 'maxiter': 5000})
             print(result.message)
-            print("Optimal solution :")
-            print(result.x)
+            # print("Optimal solution :")
+            # print(result.x)
 
             # "Dézippage" de Teta solution en self.alpha, self.beta, self.gamma, self.w
             # To Update new vectors :
@@ -376,6 +378,12 @@ class LearnCrowd:
         self.beta = betaNew
         self.gamma = gammaNew
         self.w = wNew
+        print("############ Test BFGS #######################")
+        Teta_f = np.concatenate((self.alpha.ravel(),np.array([self.beta]).ravel(),self.gamma.ravel(),self.w.ravel()),axis=0)
+        print(Teta_init-Teta_f)
+        print("")
+        plt.plot(np.linspace(1,cpt_iter,cpt_iter),LH)
+        plt.show()
 
     def predict(self, X, seuil):
         #on prédit les vrais labels à partir des données X
@@ -710,7 +718,7 @@ def LearnfromtheCrowd(N,T, d, modele,qualite_annotateurs, generateur,noise_truth
     print("Génération des données")
 
     xtrain, ytrain,ztrain = generateur(N,T,qualite_annotateurs,noise_truth)
-    #xtest, ytest,ztest = generateur(N,T,qualite_annotateurs,noise_truth)
+    xtest, ytest,ztest = generateur(N,T,qualite_annotateurs,noise_truth)
 
     '''
     print("Données d'entrainement")
@@ -726,10 +734,10 @@ def LearnfromtheCrowd(N,T, d, modele,qualite_annotateurs, generateur,noise_truth
     '''
     print("Vrais labels: ", ztrain)
 
-    if modele=="Bernoulli":
-        plot_data(xtrain,ytrain[:,0])
-        plt.title("Annotations d'un labelleur")
-        plt.show()
+    # if modele=="Bernoulli":
+    #     plot_data(xtrain,ytrain[:,0])
+    #     plt.title("Annotations d'un labelleur")
+    #     plt.show()
 
     #print("Données de test")
     '''print("Données X : ", xtest)
@@ -756,15 +764,16 @@ def LearnfromtheCrowd(N,T, d, modele,qualite_annotateurs, generateur,noise_truth
     print("Score en Train : ",strain)
 
     #plot_frontiere(xtest,S.predict(xtest),step=50) C'est XTEST ? Pas ZTEST ?
-    plot_data(xtrain,S.predict(xtrain,0.5))
-    plt.title("Prédictions finales sur le Train après crowdlearning")
-    plt.show()
+    # plot_data(xtrain,S.predict(xtrain,0.5))
+    # plt.title("Prédictions finales sur le Train après crowdlearning")
+    # plt.show()
 
-    '''
+
     stest=S.score(xtest,ztest,0.5)
-    print("Performances sur les données de test : ")<&
+    print("Performances sur les données de test : ")
     print("Score en Test : ", stest)
 
+    '''
     #plot_frontiere(xtest,S.predict(xtest),step=50)
     plot_data(xtest,S.predict(xtest,0.5))
     plt.title("Prédictions finales sur le Test après crowdlearning")
@@ -777,9 +786,9 @@ def LearnfromtheCrowd(N,T, d, modele,qualite_annotateurs, generateur,noise_truth
     print("Score en Train (Majority Voting) : ", strain_majority)
     print("")
 
-    plot_data(xtrain,M.predict(ytrain,0.5))
-    plt.title("Prédictions finales sur le Train après MajorityVoting")
-    plt.show()
+    # plot_data(xtrain,M.predict(ytrain,0.5))
+    # plt.title("Prédictions finales sur le Train après MajorityVoting")
+    # plt.show()
 
     '''
     stest_majority= M.score(ytest,ztest)
@@ -850,13 +859,13 @@ def LearnfromtheCrowd(N,T, d, modele,qualite_annotateurs, generateur,noise_truth
     #stest,stest_majority
 
 def learn_cas_unif_x():
-    N = 50 #nb données
+    N = 100 #nb données
     T = 10 #nb annotateurs
     d = 2 #nb dimension des données : pas modifiable (gen_arti ne génère que des données de dimension 2)
-    noise_truth=0 #bruit sur l'attribution des vrais labels gaussiens sur les données 2D (on pourrait aussi jouer sur ecart-type gaussienne avec sigma)
+    noise_truth=0.05 #bruit sur l'attribution des vrais labels gaussiens sur les données 2D (on pourrait aussi jouer sur ecart-type gaussienne avec sigma)
     modele= "Bernoulli"
 
-    qualite_annotateurs_Bernoulli=[0.9]*10 #Proba que l'annotateur ait raison
+    qualite_annotateurs_Bernoulli=[0.96]*T #Proba que l'annotateur ait raison
     LearnfromtheCrowd(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth)
 
     #qualite_annotateurs_Bernoulli=[0.1] #Proba que l'annotateur ait raison dans la zone 1 de données (1-la valeur dans la zone 2)
