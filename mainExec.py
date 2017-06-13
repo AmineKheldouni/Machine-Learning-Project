@@ -19,6 +19,4 @@ from resultFunctions import *
 learn_cas_unif_x(create_class_and_learn)
 #learn_cas_unif_x(create_class_and_learn2)
 #learn_cas_depend_x()
-
-# testTrueData(LearnCrowd)
 # traceTrueData(LearnCrowd)

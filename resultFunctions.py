@@ -190,7 +190,7 @@ def trace_ROC(S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest):
         TP_test_labelleurs.append(tp)
         FP_test_labelleurs.append(fp)
 
-    seuils=[0.001*k for k in range(1001)]
+    seuils=[-100*k for k in range(200)]
 
     TP_train_crowd=[]
     FP_train_crowd=[]
@@ -208,7 +208,7 @@ def trace_ROC(S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest):
     FP_test_class=[]
 
     for s in seuils:
-        PREDICTS = predicts(0,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,s)
+        PREDICTS = predicts(0,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,1/(1+np.exp(-s)))
         tp,fp=TP_FP(PREDICTS[0],ztrain)
         #print(PREDICTS[0],ztrain)
         TP_train_crowd.append(tp)
@@ -248,13 +248,13 @@ def trace_ROC(S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest):
 #VII. EXPERIENCES
 
 def learn_cas_unif_x(f=create_class_and_learn):
-    N = 100 #nb données
-    T = 2 #nb annotateurs
+    N = 50 #nb données
+    T = 5 #nb annotateurs
     d = 2 #nb dimension des données : pas modifiable (gen_arti ne génère que des données de dimension 2)
-    noise_truth=0.5 #bruit sur l'attribution des vrais labels gaussiens sur les données 2D (on pourrait aussi jouer sur ecart-type gaussienne avec sigma)
+    noise_truth= 1. #bruit sur l'attribution des vrais labels gaussiens sur les données 2D (on pourrait aussi jouer sur ecart-type gaussienne avec sigma)
     modele= "Bernoulli"
 
-    qualite_annotateurs_Bernoulli=[[0.7,0.7],[0.7,0.7]] #Proba que l'annotateur ait raison
+    qualite_annotateurs_Bernoulli=[(0.6, 0.6)]*T #Proba que l'annotateur ait raison
     #qualite_annotateurs_Bernoulli=[[0.6,0.6],[0.6,0.6],[0.6,0.6],[0.7,0.7],[0.9,0.9]]
     Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth)
 
@@ -363,7 +363,7 @@ def LearnfromtheCrowd2(N,T, d, modele,qualite_annotateurs, generateur,noise_trut
     plt.show()
 
 ####################################
-
+# TRACES DONNEES REELLES
 ####################################
 
 def regularisation(classifier):
@@ -390,6 +390,7 @@ def regularisation(classifier):
     plt.ylabel("Erreurs")
     plt.title("Erreurs d'entrainement (bleu) et de test (rouge) \n en fonction du paramètre de régularisation")
     plt.show()
+
 
 ############################################
 ############################################
@@ -438,16 +439,10 @@ def nb_donnees(classifier):
 
 def traceTrueData(classifier):
     S = classifier(T,N,d)
+    M = MajorityVoting()
+    C = Classifier_RegLog()
 
-    print("Apprentissage")
-    S.fit(xtrain, ytrain, max_iter=14)
+    S.fit(xtrain, ytrain, max_iter=14,draw_convergence=True)
+    C.fit(xtrain,ztrain,0.005,1000,affiche=False)
 
-    print("Performances sur les données d'entrainement : ")
-    print("Score en Train : ", S.score(xtrain,ztrain,0.5))
-    print("")
-
-    print("Performances sur les données de test : ")
-    print("Score en Test : ", S.score(xtest,ztest,0.5))
-
-    regularisation(classifier)
-    nb_donnees(classifier)
+    predicts(2,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,0.5,affiche=True)
