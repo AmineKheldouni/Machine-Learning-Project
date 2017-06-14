@@ -70,7 +70,6 @@ class LearnCrowd:
         # sum = traite(sum)
         # results[:,0] = np.multiply(results[:,0],1/sum)
         # results[:,1] = np.multiply(results[:,1],1/sum)
-
         return results
 
     def likelihood(self, Pt, X, Y, model, alpha, beta, gamma, w):
@@ -203,8 +202,8 @@ class LearnCrowd:
 
         self.alpha = np.zeros((1,d))
         self.beta = 1
-        alphaNew = np.random.rand(1,d)*(-0)
-        betaNew = np.random.rand()*(-0)
+        alphaNew = np.random.rand(1,d)*(0.3)
+        betaNew = 0.2
         wNew = np.random.rand(d,T)
         gammaNew = np.random.rand(1,T)
 
@@ -231,110 +230,24 @@ class LearnCrowd:
 
             #if model=="Bernoulli":
             Pt = self.expects_labels_Bernoulli(X, Y, self.alpha, self.beta, self.gamma, self.w)
-            #elif model=="Gaussian":
-            #Pt = self.expects_labels_Gaussian(X, Y, self.alpha, self.beta, self.gamma, self.w)
 
-            #print(Pt)
-            # Maximization (M-step)
+            Theta_init = np.concatenate((alphaNew.ravel(),np.array([betaNew]).ravel(),gammaNew.ravel(),wNew.ravel()),axis=0) #initial guess
 
-            # "Zippage" de self.alpha, self.beta, self.gamma, self.w en un grand vecteur Teta
+            Gtheta = -self.grad_likelihood_2(Pt, X, Y, model, Theta_init[0:d].reshape((1,d)), float(Theta_init[d:d+1]), Theta_init[d+1:d+1+T].reshape((1,T)), Theta_init[d+1+T:d+1+T+d*T].reshape((d,T)))
 
-            BFGSfunc = lambda vect : -self.likelihood(Pt, X, Y, model, vect[0:d].reshape((1,d)), float(vect[d:d+1]), vect[d+1:d+1+T].reshape((1,T)), vect[d+1+T:d+1+T+d*T].reshape((d,T)))
+            step = 0.01/(1+cpt_iter)**2
+            Theta_init -= step*Gtheta
 
-            BFGSJac = lambda vect : -self.grad_likelihood_2(Pt, X, Y, model, vect[0:d].reshape((1,d)), float(vect[d:d+1]), vect[d+1:d+1+T].reshape((1,T)), vect[d+1+T:d+1+T+d*T].reshape((d,T)))
-
-            Teta_init = np.concatenate((alphaNew.ravel(),np.array([betaNew]).ravel(),gammaNew.ravel(),wNew.ravel()),axis=0) #initial guess
-            if cpt_iter == 1:
-                Teta_i = Teta_init
-            #rappels des tailles de alpha, beta, gamma, w : (1,d), 1, (1,T), (d,T)
-            LH.append(BFGSfunc(Teta_init))
-            result = minimize(BFGSfunc, Teta_init, method='BFGS', jac = BFGSJac,\
-                              options={'gtol': 1e-10, 'disp': True, 'maxiter': 1000})
-            print(result.message)
-            # print("Optimal solution :")
-            # print(result.x)
-
-            # "Dézippage" de Teta solution en self.alpha, self.beta, self.gamma, self.w
-            # To Update new vectors :
-
-            Teta = result.x
-            print("SUCCESS : ")
-            print(result.success)
+            Gtheta = -self.grad_likelihood_2(Pt, X, Y, model, Theta_init[0:d].reshape((1,d)), float(Theta_init[d:d+1]), Theta_init[d+1:d+1+T].reshape((1,T)), Theta_init[d+1+T:d+1+T+d*T].reshape((d,T)))
 
             print("NORME DU GRADIENT : ")
-            normGrad = np.linalg.norm(BFGSJac(Teta))
+            normGrad = np.linalg.norm(Gtheta)
             print(normGrad)
 
-            alphaNew = Teta[0:d].reshape((1,d))
-            betaNew = float(Teta[d:d+1])
-            gammaNew = Teta[d+1:d+1+T].reshape((1,T))
-            wNew = Teta[d+1+T:d+1+T+d*T].reshape((d,T))
-
-        self.alpha = alphaNew
-        self.beta = betaNew
-        self.gamma = gammaNew
-        self.w = wNew
-        #print("############ Test BFGS #######################")
-        Teta_f = np.concatenate((self.alpha.ravel(),np.array([self.beta]).ravel(),self.gamma.ravel(),self.w.ravel()),axis=0)
-        #print(abs(Teta_i-Teta_f))
-        print("")
-        if draw_convergence:
-            plt.plot(np.linspace(1,cpt_iter,cpt_iter),LH)
-            plt.title("Convergence de l'EM")
-            plt.show()
-    def fit(self, X, Y, epsGrad=10**(-8), model="Bernoulli", eps = 10**(-15), max_iter=500, draw_convergence=False):
-        N = X.shape[0]
-        d = X.shape[1]
-        T = Y.shape[1]
-
-        #EM Algorithm
-
-        #Initialization
-
-        self.alpha = np.zeros((1,d))
-        self.beta = 0
-        alphaNew = np.random.rand(1,d)
-        betaNew = np.random.rand()
-        wNew = np.random.rand(d,T)
-        gammaNew = np.random.rand(1,T)
-
-        cpt_iter=0
-        LH = []
-        #if model=="Bernoulli":
-        Pt = self.expects_labels_Bernoulli(X, Y, self.alpha, self.beta, self.gamma, self.w)
-        normGrad = np.linalg.norm(-self.grad_likelihood(Pt, X, Y, model, self.alpha, self.beta, self.gamma, self.w))
-
-        # while ( np.linalg.norm(self.alpha - alphaNew)**2 + np.linalg.norm(self.beta - betaNew)**2 > eps and cpt_iter < max_iter):
-        while ( normGrad > 10**(-7) and cpt_iter < max_iter):
-            cpt_iter+=1
-
-            print("ITERATION N°",cpt_iter)
-
-            self.alpha = alphaNew
-            self.beta = betaNew
-            self.gamma = gammaNew
-            self.w = wNew
-            normGrad = np.linalg.norm(-self.grad_likelihood(Pt, X, Y, model, self.alpha, self.beta, self.gamma, self.w))
-
-
-            # Expectation (E-step)
-
-            #if model=="Bernoulli":
-            Pt = self.expects_labels_Bernoulli(X, Y, self.alpha, self.beta, self.gamma, self.w)
-            #elif model=="Gaussian":
-            #Pt = self.expects_labels_Gaussian(X, Y, self.alpha, self.beta, self.gamma, self.w)
-
-            #print(Pt)
-            # Maximization (M-step)
-
-            # "Zippage" de self.alpha, self.beta, self.gamma, self.w en un grand vecteur Teta
-            Galpha, Gbeta, Ggamma, Gw = self.grad_likelihood_V2(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew)
-            step = (0.01/(cpt_iter+1))**2
-            alphaNew += step * Galpha
-            betaNew += step * Gbeta
-            gammaNew += step * Ggamma
-            wNew += step * Gw
-
+            alphaNew = Theta_init[0:d].reshape((1,d))
+            betaNew = float(Theta_init[d:d+1])
+            gammaNew = Theta_init[d+1:d+1+T].reshape((1,T))
+            wNew = Theta_init[d+1+T:d+1+T+d*T].reshape((d,T))
             LH.append(np.linalg.norm(self.alpha - alphaNew)**2 + np.linalg.norm(self.beta - betaNew)**2)
 
         self.alpha = alphaNew
@@ -349,6 +262,73 @@ class LearnCrowd:
             plt.plot(np.linspace(1,cpt_iter,cpt_iter),LH)
             plt.title("Convergence de l'EM")
             plt.show()
+    def fit(self, X, Y, epsGrad=10**(-5), model="Bernoulli", eps = 10**(-8), max_iter=100, draw_convergence=False):
+        N = X.shape[0]
+        d = X.shape[1]
+        T = Y.shape[1]
+
+        #EM Algorithm
+
+        #Initialization
+
+        self.alpha = np.zeros((1,d))
+        self.beta = 0
+        alphaNew = np.ones((1,d))*(0.4)
+        betaNew = 0.1
+        wNew = np.random.rand(d,T)
+        gammaNew = np.random.rand(1,T)
+
+        cpt_iter=0
+        LH = []
+        #if model=="Bernoulli":
+        Pt = self.expects_labels_Bernoulli(X, Y, self.alpha, self.beta, self.gamma, self.w)
+        normGrad = np.linalg.norm(self.grad_likelihood(Pt, X, Y, model, self.alpha, self.beta, self.gamma, self.w))
+
+        # while ( np.linalg.norm(self.alpha - alphaNew)**2 + np.linalg.norm(self.beta - betaNew)**2 > eps and cpt_iter < max_iter):
+        while ( normGrad > epsGrad and cpt_iter < max_iter):
+
+
+            print("ITERATION N°",cpt_iter)
+            print("Norme du gradient : ", normGrad)
+
+            self.alpha = alphaNew
+            self.beta = betaNew
+            self.gamma = gammaNew
+            self.w = wNew
+
+
+            # Expectation (E-step)
+
+            #if model=="Bernoulli":
+            Pt = self.expects_labels_Bernoulli(X, Y, self.alpha, self.beta, self.gamma, self.w)
+            #elif model=="Gaussian":
+            #Pt = self.expects_labels_Gaussian(X, Y, self.alpha, self.beta, self.gamma, self.w)
+
+            #print(Pt)
+            # Maximization (M-step)
+
+            # "Zippage" de self.alpha, self.beta, self.gamma, self.w en un grand vecteur Teta
+            Galpha, Gbeta, Ggamma, Gw = self.grad_likelihood_V2(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew)
+            normGrad = np.linalg.norm(Galpha)+np.linalg.norm(Gbeta)+np.linalg.norm(Ggamma)+np.linalg.norm(Gw)
+
+            step = 0.01/((cpt_iter+1))**2
+            alphaNew += step * Galpha
+            betaNew += step * Gbeta
+            gammaNew += step * Ggamma
+            wNew += step * Gw
+            cpt_iter+=1
+
+            LH.append(np.linalg.norm(self.alpha - alphaNew)**2 + np.linalg.norm(self.beta - betaNew)**2)
+
+        self.alpha = alphaNew
+        self.beta = betaNew
+        self.gamma = gammaNew
+        self.w = wNew
+        #print("############ Test BFGS #######################")
+        if draw_convergence:
+            plt.plot(np.linspace(1,cpt_iter,cpt_iter),LH)
+            plt.title("Convergence de l'EM")
+            plt.show()
 
 
     def predict(self, X, seuil):
@@ -359,7 +339,6 @@ class LearnCrowd:
         labels_predicted = proba_class_1 > seuil
         bool2float = lambda x:float(x)
         bool2float=np.vectorize(bool2float)
-        #print("predicts",proba_class_1)
         return bool2float(labels_predicted).ravel()
 
     def predictV3(self, X, Y, seuil, modeltrain):

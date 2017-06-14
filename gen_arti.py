@@ -161,7 +161,7 @@ def generation_Bernoulli_xdepend(N,T,qualite_annotateur_Bernoulli,noise_truth):
 
 #III. GENERATION DE X,Y,Z
 
-def genere(N,T,d,modele,qualite_annotateurs,generateur,noise_truth,affiche=True):
+def genere(N,T,d,modele,qualite_annotateurs,generateur,noise_truth,affiche=False):
     print("Rappel des paramètres")
     print("Nombre de données générées : ", N)
     print("Nombre de dimensions des données générées : ", d)

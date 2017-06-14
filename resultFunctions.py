@@ -8,7 +8,7 @@ from Classifier1 import *
 from Classifier2 import *
 
 
-def create_class_and_learn(xtrain,ytrain,ztrain):
+def create_class_and_learn(xtrain,ytrain,ztrain,draw_convergence=False):
 
     (N,d)=np.shape(xtrain)
     (N,T)=np.shape(ytrain)
@@ -18,7 +18,7 @@ def create_class_and_learn(xtrain,ytrain,ztrain):
     C = Classifier_RegLog()
 
     print("Apprentissage")
-    S.fit(xtrain,ytrain,draw_convergence=True, epsGrad=10**(-11))
+    S.fit(xtrain,ytrain,draw_convergence=draw_convergence, epsGrad=10**(-11))
     C.fit(xtrain,ztrain,0.005,1000,affiche=False)
 
     print("alpha",S.alpha)
@@ -97,7 +97,7 @@ def predicts(type_return,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,s,affiche=
     #print("Test à l'aide de X")
 
     s_train_LearnCrowd=S.score(xtrain,ztrain,s)
-    predicts_train_LearnCrowd=S.predict(xtrain,s);
+    predicts_train_LearnCrowd=S.predict(xtrain,s)
     #plot_frontiere(xtest,S.predict(xtest),step=50) C'est XTEST ? Pas ZTEST ?
     if affiche:
         print("Performances sur les données d'entrainement : ")
@@ -190,7 +190,7 @@ def trace_ROC(S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest):
         TP_test_labelleurs.append(tp)
         FP_test_labelleurs.append(fp)
 
-    seuils=[-100*k for k in range(200)]
+    seuils=[0.001*k for k in range(1001)]
 
     TP_train_crowd=[]
     FP_train_crowd=[]
@@ -208,7 +208,7 @@ def trace_ROC(S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest):
     FP_test_class=[]
 
     for s in seuils:
-        PREDICTS = predicts(0,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,1/(1+np.exp(-s)))
+        PREDICTS = predicts(0,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,s)
         tp,fp=TP_FP(PREDICTS[0],ztrain)
         #print(PREDICTS[0],ztrain)
         TP_train_crowd.append(tp)
@@ -248,10 +248,10 @@ def trace_ROC(S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest):
 #VII. EXPERIENCES
 
 def learn_cas_unif_x(f=create_class_and_learn):
-    N = 50 #nb données
+    N = 100 #nb données
     T = 5 #nb annotateurs
     d = 2 #nb dimension des données : pas modifiable (gen_arti ne génère que des données de dimension 2)
-    noise_truth= 1. #bruit sur l'attribution des vrais labels gaussiens sur les données 2D (on pourrait aussi jouer sur ecart-type gaussienne avec sigma)
+    noise_truth= 0.6 #bruit sur l'attribution des vrais labels gaussiens sur les données 2D (on pourrait aussi jouer sur ecart-type gaussienne avec sigma)
     modele= "Bernoulli"
 
     qualite_annotateurs_Bernoulli=[(0.6, 0.6)]*T #Proba que l'annotateur ait raison
@@ -265,7 +265,7 @@ def learn_cas_unif_x(f=create_class_and_learn):
     ytest=Vect[4]
     ztest=Vect[5]
 
-    S,M,C = f(xtrain,ytrain,ztrain)
+    S,M,C = f(xtrain,ytrain,ztrain,draw_convergence=True)
 
     predicts(2,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,0.5,affiche=True)
     trace_ROC(S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest)
@@ -362,6 +362,202 @@ def LearnfromtheCrowd2(N,T, d, modele,qualite_annotateurs, generateur,noise_trut
     plt.title("PrĂŠdictions finales sur le Test")
     plt.show()
 
+def drawScoreQuality(s, f=create_class_and_learn, N_MC=1):
+    N = 100 #nb données
+    T = 10 #nb annotateurs
+    d = 2 #nb dimension des données : pas modifiable (gen_arti ne génère que des données de dimension 2)
+    noise_truth= 0.7 #bruit sur l'attribution des vrais labels gaussiens sur les données 2D (on pourrait aussi jouer sur ecart-type gaussienne avec sigma)
+    modele= "Bernoulli"
+    qualite_consideree = np.arange(0.50,1.,0.05)
+
+    scoreS_train = []
+    scoreM_train = []
+    scoreC_train = []
+
+    scoreS_test = []
+    scoreM_test = []
+    scoreC_test = []
+
+    for q in qualite_consideree:
+        qualite_annotateurs_Bernoulli=[(q, q)]*T #Proba que l'annotateur ait raison
+        scoreStrain = 0
+        scoreMtrain = 0
+        scoreCtrain = 0
+        scoreStest = 0
+        scoreMtest = 0
+        scoreCtest = 0
+        for i in range(N_MC):
+            Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth)
+            xtrain=Vect[0]
+            ytrain=Vect[1]
+            ztrain=Vect[2]
+            xtest=Vect[3]
+            ytest=Vect[4]
+            ztest=Vect[5]
+            S,M,C = f(xtrain,ytrain,ztrain)
+            scoreStrain += S.score(xtrain,ztrain,s)
+            scoreMtrain += M.score(ytrain,ztrain,s)
+            scoreCtrain += C.score(xtrain,ztrain,s)
+            scoreStest += S.score(xtest,ztest,s)
+            scoreMtest += M.score(ytest,ztest,s)
+            scoreCtest += C.score(xtest,ztest,s)
+
+        scoreS_train.append(scoreStrain/N_MC)
+        scoreM_train.append(scoreMtrain/N_MC)
+        scoreC_train.append(scoreCtrain/N_MC)
+        scoreS_test.append(scoreStest/N_MC)
+        scoreM_test.append(scoreMtest/N_MC)
+        scoreC_test.append(scoreCtest/N_MC)
+
+    plt.plot(qualite_consideree, np.array(scoreS_train), color='blue',label="score de train (CrowLearning)")
+    plt.plot(qualite_consideree,np.array(scoreM_train),color='red',label="score de train (MajorityVoting)")
+    plt.plot(qualite_consideree, np.array(scoreC_train), color='yellow',label="score de train (RegLog)")
+    plt.xlabel("qualité des annotateurs")
+    plt.ylabel("score en apprentissage")
+    plt.legend(bbox_to_anchor=(1, 1), loc=1, borderaxespad=0.)
+    plt.draw()
+    plt.show()
+
+    plt.plot(qualite_consideree,np.array(scoreS_test),color='blue',label="score de test (CrowLearning)")
+    plt.plot(qualite_consideree, np.array(scoreM_test), color='red',label="score de test (MajorityVoting)")
+    plt.plot(qualite_consideree,np.array(scoreC_test),color='yellow',label="score de test (RegLog)")
+    plt.xlabel("qualité des annotateurs")
+    plt.ylabel("score en test")
+    plt.legend(bbox_to_anchor=(1, 1), loc=1, borderaxespad=0.)
+    plt.draw()
+    plt.show()
+
+def drawScoreAnnotateurs(s, f=create_class_and_learn, N_MC=1):
+    N = 100 #nb données
+    list_T = np.arange(1,21).astype(int)
+    d = 2 #nb dimension des données : pas modifiable (gen_arti ne génère que des données de dimension 2)
+    noise_truth= 0.8 #bruit sur l'attribution des vrais labels gaussiens sur les données 2D (on pourrait aussi jouer sur ecart-type gaussienne avec sigma)
+    modele= "Bernoulli"
+
+    scoreS_train = []
+    scoreM_train = []
+    scoreC_train = []
+
+    scoreS_test = []
+    scoreM_test = []
+    scoreC_test = []
+
+    for T in list_T:
+        qualite_annotateurs_Bernoulli=[(0.6, 0.6)]*T #Proba que l'annotateur ait raison
+        #qualite_annotateurs_Bernoulli=[[0.6,0.6],[0.6,0.6],[0.6,0.6],[0.7,0.7],[0.9,0.9]]
+        scoreStrain = 0
+        scoreMtrain = 0
+        scoreCtrain = 0
+        scoreStest = 0
+        scoreMtest = 0
+        scoreCtest = 0
+        for i in range(N_MC):
+            Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth)
+            xtrain=Vect[0]
+            ytrain=Vect[1]
+            ztrain=Vect[2]
+            xtest=Vect[3]
+            ytest=Vect[4]
+            ztest=Vect[5]
+            S,M,C = f(xtrain,ytrain,ztrain)
+            scoreStrain += S.score(xtrain,ztrain,s)
+            scoreMtrain += M.score(ytrain,ztrain,s)
+            scoreCtrain += C.score(xtrain,ztrain,s)
+            scoreStest += S.score(xtest,ztest,s)
+            scoreMtest += M.score(ytest,ztest,s)
+            scoreCtest += C.score(xtest,ztest,s)
+
+        scoreS_train.append(scoreStrain/N_MC)
+        scoreM_train.append(scoreMtrain/N_MC)
+        scoreC_train.append(scoreCtrain/N_MC)
+        scoreS_test.append(scoreStest/N_MC)
+        scoreM_test.append(scoreMtest/N_MC)
+        scoreC_test.append(scoreCtest/N_MC)
+
+    plt.plot(list_T, np.array(scoreS_train), color='blue',label="score de train (CrowLearning)")
+    plt.plot(list_T,np.array(scoreM_train),color='red',label="score de train (MajorityVoting)")
+    plt.plot(list_T, np.array(scoreC_train), color='yellow',label="score de train (RegLog)")
+    plt.xlabel("nombre d'annotateurs")
+    plt.ylabel("score en apprentissage")
+    plt.legend(bbox_to_anchor=(1, 1), loc=1, borderaxespad=0.)
+    plt.draw()
+    plt.show()
+
+    plt.plot(list_T,np.array(scoreS_test),color='blue',label="score de test (CrowLearning)")
+    plt.plot(list_T, np.array(scoreM_test), color='red',label="score de test (MajorityVoting)")
+    plt.plot(list_T,np.array(scoreC_test),color='yellow',label="score de test (RegLog)")
+    plt.xlabel("nombre d'annotateurs")
+    plt.ylabel("score en test")
+    plt.legend(bbox_to_anchor=(1, 1), loc=1, borderaxespad=0.)
+    plt.draw()
+    plt.show()
+
+
+def drawScorePropExperts(s, slicing, f=create_class_and_learn, N_MC = 1):
+    N = 100 #nb données
+    list_T = np.arange(1,21).astype(int)
+    d = 2 #nb dimension des données : pas modifiable (gen_arti ne génère que des données de dimension 2)
+    noise_truth= 0.8 #bruit sur l'attribution des vrais labels gaussiens sur les données 2D (on pourrait aussi jouer sur ecart-type gaussienne avec sigma)
+    modele= "Bernoulli"
+    # slicing = Nombre d'experts
+
+    scoreS_train = []
+    scoreM_train = []
+    scoreC_train = []
+
+    scoreS_test = []
+    scoreM_test = []
+    scoreC_test = []
+
+    for T in list_T:
+        qualite_annotateurs_Bernoulli=[(0.9, 0.9)]*slicing+ [(0.6,0.6)]*(T-slicing) #Proba que l'annotateur ait raison
+        #qualite_annotateurs_Bernoulli=[[0.6,0.6],[0.6,0.6],[0.6,0.6],[0.7,0.7],[0.9,0.9]]
+        scoreStrain = 0
+        scoreMtrain = 0
+        scoreCtrain = 0
+        scoreStest = 0
+        scoreMtest = 0
+        scoreCtest = 0
+        for i in range(N_MC):
+            Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth)
+            xtrain=Vect[0]
+            ytrain=Vect[1]
+            ztrain=Vect[2]
+            xtest=Vect[3]
+            ytest=Vect[4]
+            ztest=Vect[5]
+            S,M,C = f(xtrain,ytrain,ztrain)
+            scoreStrain += S.score(xtrain,ztrain,s)
+            scoreMtrain += M.score(ytrain,ztrain,s)
+            scoreCtrain += C.score(xtrain,ztrain,s)
+            scoreStest += S.score(xtest,ztest,s)
+            scoreMtest += M.score(ytest,ztest,s)
+            scoreCtest += C.score(xtest,ztest,s)
+
+        scoreS_train.append(scoreStrain/N_MC)
+        scoreM_train.append(scoreMtrain/N_MC)
+        scoreC_train.append(scoreCtrain/N_MC)
+        scoreS_test.append(scoreStest/N_MC)
+        scoreM_test.append(scoreMtest/N_MC)
+        scoreC_test.append(scoreCtest/N_MC)
+
+    plt.plot(list_T, np.array(scoreS_train), color='blue',label="score de train (CrowLearning)")
+    plt.plot(list_T,np.array(scoreM_train),color='red',label="score de train (MajorityVoting)")
+    plt.plot(list_T, np.array(scoreC_train), color='yellow',label="score de train (RegLog)")
+    plt.xlabel("nombre d'annotateurs")
+    plt.ylabel("score en apprentissage")
+    plt.legend(bbox_to_anchor=(1, 1), loc=1, borderaxespad=0.)
+    plt.draw()
+    plt.show()
+
+    plt.plot(list_T,np.array(scoreS_test),color='blue',label="score de test (CrowLearning)")
+    plt.plot(list_T, np.array(scoreM_test), color='red',label="score de test (MajorityVoting)")
+    plt.plot(list_T,np.array(scoreC_test),color='yellow',label="score de test (RegLog)")
+    plt.xlabel("nombre d'annotateurs")
+    plt.ylabel("score en test")
+    plt.legend(bbox_to_anchor=(1, 1), loc=1, borderaxespad=0.)
+    plt.draw()
+    plt.show()
 ####################################
 # TRACES DONNEES REELLES
 ####################################
@@ -442,7 +638,9 @@ def traceTrueData(classifier):
     M = MajorityVoting()
     C = Classifier_RegLog()
 
-    S.fit(xtrain, ytrain, max_iter=14,draw_convergence=True)
+    S.fit(xtrain, ytrain, max_iter=200,draw_convergence=False)
     C.fit(xtrain,ztrain,0.005,1000,affiche=False)
 
     predicts(2,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,0.5,affiche=True)
+
+    trace_ROC(S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest)
