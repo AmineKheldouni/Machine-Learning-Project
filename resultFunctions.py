@@ -8,12 +8,12 @@ from Classifier1 import *
 from Classifier2 import *
 
 
-def create_class_and_learn(xtrain,ytrain,ztrain,draw_convergence=False):
+def create_class_and_learn(xtrain,ytrain,ztrain,classifier=LearnCrowd,draw_convergence=False):
 
     (N,d)=np.shape(xtrain)
     (N,T)=np.shape(ytrain)
 
-    S = LearnCrowd(T,N,d)
+    S = classifier(T,N,d)
     M = MajorityVoting()
     C = Classifier_RegLog()
 
@@ -29,23 +29,6 @@ def create_class_and_learn(xtrain,ytrain,ztrain,draw_convergence=False):
     return S,M,C
 
 
-def create_class_and_learn2(xtrain,ytrain,ztrain):
-    (N,d)=np.shape(xtrain)
-    (N,T)=np.shape(ytrain)
-
-    S = LearnCrowd2(T,N,d)
-    M = MajorityVoting()
-    C = Classifier_RegLog()
-
-    print("Apprentissage")
-    S.fit(xtrain,ytrain,draw_convergence=True,epsGrad=10**(-11))
-    C.fit(xtrain,ztrain,0.005,1000,affiche=False)
-
-    print("alpha",S.alpha)
-    print("beta",S.beta)
-    print("w",S.w)
-
-    return S,M,C
 #VI. PREDIT LES VRAIS LABELS, DONNE LES SCORES, AFFICHE LES PREDICTIONS POUR LE SEUIL S
 
 #if type_return=0
@@ -323,7 +306,7 @@ def learn_cas_depend_x(f=create_class_and_learn):
     plt.show()
 
 
-def LearnfromtheCrowd2(N,T, d, modele,qualite_annotateurs, generateur,noise_truth=0):
+def LearnfromtheCrowd2(N,T, d, modele,qualite_annotateurs, generateur, classifier=LearnCrowd,noise_truth=0):
     print("Rappel des paramĂ¨tres")
     print("Nombre de donnĂŠes gĂŠnĂŠrĂŠes : ", N)
     print("Nombre de dimensions des donnĂŠes gĂŠnĂŠrĂŠes : ", d)
@@ -362,7 +345,7 @@ def LearnfromtheCrowd2(N,T, d, modele,qualite_annotateurs, generateur,noise_trut
     plt.title("PrĂŠdictions finales sur le Test")
     plt.show()
 
-def drawScoreQuality(s, f=create_class_and_learn, N_MC=1):
+def drawScoreQuality(s, f=create_class_and_learn, classifier=LearnCrowd, N_MC=1):
     N = 100 #nb données
     T = 10 #nb annotateurs
     d = 2 #nb dimension des données : pas modifiable (gen_arti ne génère que des données de dimension 2)
@@ -394,7 +377,7 @@ def drawScoreQuality(s, f=create_class_and_learn, N_MC=1):
             xtest=Vect[3]
             ytest=Vect[4]
             ztest=Vect[5]
-            S,M,C = f(xtrain,ytrain,ztrain)
+            S,M,C = f(xtrain,ytrain,ztrain,classifier=classifier)
             scoreStrain += S.score(xtrain,ztrain,s)
             scoreMtrain += M.score(ytrain,ztrain,s)
             scoreCtrain += C.score(xtrain,ztrain,s)
@@ -427,7 +410,7 @@ def drawScoreQuality(s, f=create_class_and_learn, N_MC=1):
     plt.draw()
     plt.show()
 
-def drawScoreAnnotateurs(s, f=create_class_and_learn, N_MC=1):
+def drawScoreAnnotateurs(s, f=create_class_and_learn, classifier=LearnCrowd, N_MC=1):
     N = 100 #nb données
     list_T = np.arange(1,21).astype(int)
     d = 2 #nb dimension des données : pas modifiable (gen_arti ne génère que des données de dimension 2)
@@ -459,7 +442,7 @@ def drawScoreAnnotateurs(s, f=create_class_and_learn, N_MC=1):
             xtest=Vect[3]
             ytest=Vect[4]
             ztest=Vect[5]
-            S,M,C = f(xtrain,ytrain,ztrain)
+            S,M,C = f(xtrain,ytrain,ztrain,classifier=classifier)
             scoreStrain += S.score(xtrain,ztrain,s)
             scoreMtrain += M.score(ytrain,ztrain,s)
             scoreCtrain += C.score(xtrain,ztrain,s)
@@ -493,7 +476,7 @@ def drawScoreAnnotateurs(s, f=create_class_and_learn, N_MC=1):
     plt.show()
 
 
-def drawScorePropExperts(s, slicing, f=create_class_and_learn, N_MC = 1):
+def drawScorePropExperts(s, slicing, f=create_class_and_learn, classifier=LearnCrowd, N_MC = 1):
     N = 100 #nb données
     list_T = np.arange(1,21).astype(int)
     d = 2 #nb dimension des données : pas modifiable (gen_arti ne génère que des données de dimension 2)
@@ -526,7 +509,7 @@ def drawScorePropExperts(s, slicing, f=create_class_and_learn, N_MC = 1):
             xtest=Vect[3]
             ytest=Vect[4]
             ztest=Vect[5]
-            S,M,C = f(xtrain,ytrain,ztrain)
+            S,M,C = f(xtrain,ytrain,ztrain,classifier=classifier)
             scoreStrain += S.score(xtrain,ztrain,s)
             scoreMtrain += M.score(ytrain,ztrain,s)
             scoreCtrain += C.score(xtrain,ztrain,s)

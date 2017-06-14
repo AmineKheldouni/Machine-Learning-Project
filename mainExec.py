@@ -24,8 +24,8 @@ learn_cas_unif_x(create_class_and_learn)
 # Courbe (a) sharelatex :
 
 drawScoreQuality(0.5,N_MC=5)
-# drawScoreAnnotateurs(0.5,N_MC=5)
-# drawScorePropExperts(0.5,2,N_MC=5)
+drawScoreAnnotateurs(0.5,N_MC=3)
+drawScorePropExperts(0.5,2,N_MC=3)
 
 
 """
