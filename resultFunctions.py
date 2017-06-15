@@ -39,32 +39,33 @@ def create_class_and_learn(xtrain,ytrain,ztrain,classifier=LearnCrowd,draw_conve
 #RETOURNE LE GROS VECTEUR DES SCORES A 6 TERMES (3 CLASSIFIEURS, TRAIN OU TEST) :
 #[s_train_LearnCrowd,s_train_Majority,s_train_RegLog,s_test_LearnCrowd,s_test_Majority,s_test_RegLog]
 
-X,Z = load_XZ('true_data/dataXZ_Adult.txt')
+def giveTrueData():
+    X,Z = load_XZ('true_data/dataXZ_Adult.txt')
 
-Y = load_Y('true_data/dataY_Adult.txt')
+    Y = load_Y('true_data/dataY_Adult.txt')
 
-XX,YY, ZZ = genereWithoutMissing(X, Y, Z)
+    XX,YY, ZZ = genereWithoutMissing(X, Y, Z)
 
-sliceTrain = int(XX.shape[0]*0.8)
-xtrain, ytrain,ztrain = XX[0:sliceTrain,:], YY[0:sliceTrain,:], ZZ[0:sliceTrain]
-xtest, ytest,ztest = XX[sliceTrain+1:,:], YY[sliceTrain+1:,:], ZZ[sliceTrain+1:]
-xtrain = np.delete(xtrain,2,axis=1)
-xtest = np.delete(xtest,2,axis=1)
+    sliceTrain = int(XX.shape[0]*0.8)
+    xtrain, ytrain,ztrain = XX[0:sliceTrain,:], YY[0:sliceTrain,:], ZZ[0:sliceTrain]
+    xtest, ytest,ztest = XX[sliceTrain+1:,:], YY[sliceTrain+1:,:], ZZ[sliceTrain+1:]
+    xtrain = np.delete(xtrain,2,axis=1)
+    xtest = np.delete(xtest,2,axis=1)
 
-xtrain = (xtrain - np.mean(xtrain)) / np.std(xtrain)
-xtest = (xtest - np.mean(xtest)) / np.std(xtest)
-ztrain = ztrain.astype(int)
-ztest = ztest.astype(int)
-ytrain = ytrain.astype(int)
-ytest = ytest.astype(int)
-
-T = ytrain.shape[1]
-N = xtrain.shape[0]
-d = xtrain.shape[1]
+    xtrain = (xtrain - np.mean(xtrain)) / np.std(xtrain)
+    xtest = (xtest - np.mean(xtest)) / np.std(xtest)
+    ztrain = ztrain.astype(int)
+    ztest = ztest.astype(int)
+    ytrain = ytrain.astype(int)
+    ytest = ytest.astype(int)
+    return xtrain,ytrain,ztrain,xtest,ytest,ztest
 
 def testTrueData(classifier):
+    xtrain,ytrain,ztrain,xtest,ytest,ztest = giveTrueData()
+    T = ytrain.shape[1]
+    N = xtrain.shape[0]
+    d = xtrain.shape[1]
     S = classifier(T,N,d)
-
     print("Apprentissage")
     S.fit(xtrain, ytrain, max_iter=40)
 
@@ -217,14 +218,14 @@ def trace_ROC(S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest):
     plt.scatter(FP_train_labelleurs,TP_train_labelleurs)
     plt.scatter(FP_train_crowd,TP_train_crowd,color="blue",label="ROC trainset CrowdLearning ")
     plt.plot(FP_train_majority,TP_train_majority,color="red",label="ROC trainset MajorityVoting")
-    plt.plot(FP_train_class,TP_train_class,color="yellow",label="ROC trainset  CrowdLearning Unsupervised")
+    plt.plot(FP_train_class,TP_train_class,color="yellow",label="ROC trainset  ClassifierTruth")
     plt.legend(bbox_to_anchor=(1, 1.14), loc=1, borderaxespad=0.)
     plt.show()
 
     plt.scatter(FP_test_labelleurs,TP_test_labelleurs)
     plt.scatter(FP_test_crowd,TP_test_crowd,color="blue",label="ROC testset crowdlearning")
     plt.plot(FP_test_majority,TP_test_majority,color="red",label="ROC testset majorityVoting")
-    plt.plot(FP_test_class,TP_test_class,color="yellow",label="ROC testset CrowdLearning Unsupervised")
+    plt.plot(FP_test_class,TP_test_class,color="yellow",label="ROC testset ClassifierTruth")
     plt.legend(bbox_to_anchor=(1, 1.14), loc=1, borderaxespad=0.)
     plt.show()
 
@@ -247,7 +248,6 @@ def learn_cas_unif_x(f=create_class_and_learn):
     xtest=Vect[3]
     ytest=Vect[4]
     ztest=Vect[5]
-
     S,M,C = f(xtrain,ytrain,ztrain,draw_convergence=True)
 
     predicts(2,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,0.5,affiche=True)
@@ -283,7 +283,7 @@ def compareNoneSpecialised(f=create_class_and_learn):
 
     qualite_annotateurs_Bernoulli = [(0.9,0.1),(0.4,0.6)]
     #qualite_annotateurs_Bernoulli=[[0.6,0.6],[0.6,0.6],[0.6,0.6],[0.7,0.7],[0.9,0.9]]
-    Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth,data_type=0,affiche=True)
+    Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth,data_type=1,affiche=True)
 
     xtrain=Vect[0]
     ytrain=Vect[1]
@@ -314,9 +314,9 @@ def compareNoneSpecialised(f=create_class_and_learn):
 
     trace_ROC(S,M,S_now,xtrain,ytrain,ztrain,xtest,ytest,ztest)
 
-def learn_cas_depend_x(f=create_class_and_learn):
+def learn_cas_depend_x(f=create_class_and_learn,N_MC=1):
 
-    special_params=np.linspace(0,0.5,100).ravel()
+    special_params=np.arange(0.05,0.45,0.01).ravel()
     score_train_crowd=[]
     score_train_majority=[]
     score_train_reglog=[]
@@ -324,45 +324,58 @@ def learn_cas_depend_x(f=create_class_and_learn):
     score_test_majority=[]
     score_test_reglog=[]
 
-    N = 50 #nb données
-    T = 3 #nb annotateurs
+    N = 100 #nb données
+    T = 2 #nb annotateurs
     d = 2 #nb dimension des données : pas modifiable (gen_arti ne génère que des données de dimension 2)
     noise_truth=0.5 #bruit sur l'attribution des vrais labels gaussiens sur les données 2D (on pourrait aussi jouer sur ecart-type gaussienne avec sigma)
     modele= "Bernoulli"
 
     for s in special_params:
-        qualite_annotateurs_Bernoulli=[[0.5+s,1-s],[1-s,0.5 + s],[0.5+s,0.5+s]] #Proba que l'annotateur ait raison dans la zone 1 de données (1-la valeur dans la zone 2)
+        qualite_annotateurs_Bernoulli=[[0.5+s,0.5-s],[1-s,s]] #Proba que l'annotateur ait raison dans la zone 1 de données (1-la valeur dans la zone 2)
+        strainS = 0
+        strainM = 0
+        strainC = 0
+        stestS = 0
+        stestM = 0
+        stestC = 0
 
-        Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth,affiche=False)
+        for i in range(N_MC):
+            Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth,affiche=False,data_type=1)
 
-        xtrain=Vect[0]
-        ytrain=Vect[1]
-        ztrain=Vect[2]
-        xtest=Vect[3]
-        ytest=Vect[4]
-        ztest=Vect[5]
+            xtrain=Vect[0]
+            ytrain=Vect[1]
+            ztrain=Vect[2]
+            xtest=Vect[3]
+            ytest=Vect[4]
+            ztest=Vect[5]
 
-        S,M,C = f(xtrain,ytrain,ztrain)
+            S,M,C = f(xtrain,ytrain,ztrain)
 
-        SCORES=predicts(1,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,0.5)
+            SCORES=predicts(1,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,0.5)
+            strainS += SCORES[0]
+            strainM += SCORES[1]
+            strainC += SCORES[2]
+            stestS += SCORES[3]
+            stestM += SCORES[4]
+            stestC += SCORES[5]
 
-        score_train_crowd.append(SCORES[0])
-        score_train_majority.append(SCORES[1])
-        score_train_reglog.append(SCORES[2])
-        score_test_crowd.append(SCORES[3])
-        score_test_majority.append(SCORES[4])
-        score_test_reglog.append(SCORES[5])
+        score_train_crowd.append(strainS)
+        score_train_majority.append(strainM)
+        score_train_reglog.append(strainC)
+        score_test_crowd.append(stestS)
+        score_test_majority.append(stestM)
+        score_test_reglog.append(stestC)
 
-    plt.plot(special_params,score_train_crowd,"blue")
-    plt.plot(special_params,score_train_majority,"red")
-    plt.plot(special_params,score_train_reglog,"yellow")
-    plt.title("Sur le train, performances entre annotateurs spécialisés et annotateurs non spécialisés")
+    plt.plot(special_params,score_train_crowd,"blue",label="Score CrowdLearning")
+    plt.plot(special_params,score_train_majority,"red",label="Score MajorityVoting")
+    plt.plot(special_params,score_train_reglog,"yellow",label="Score ClassifierTruth")
+    plt.legend(bbox_to_anchor=(1, 1), loc=1, borderaxespad=0.)
     plt.show()
 
     plt.plot(special_params,score_test_crowd,"blue")
     plt.plot(special_params,score_test_majority,"red")
     plt.plot(special_params,score_test_reglog,"yellow")
-    plt.title("Sur le test, performances entre annotateurs spécialisés et annotateurs non spécialisés")
+    plt.legend(bbox_to_anchor=(1, 1), loc=1, borderaxespad=0.)
     plt.show()
 
 
@@ -371,11 +384,11 @@ def LearnfromtheCrowd2(N,T, d, modele,qualite_annotateurs, generateur, classifie
     print("Nombre de donnĂŠes gĂŠnĂŠrĂŠes : ", N)
     print("Nombre de dimensions des donnĂŠes gĂŠnĂŠrĂŠes : ", d)
     print("Nombre d'annotateurs : ", T)
-    print("ModĂ¨le : ", modele)
+    print("Modèle : ", modele)
     # print("ProbabilitĂŠs de succĂ¨s des annotateurs : ", qualite_annotateurs)
     print("")
 
-    print("GĂŠnĂŠration des donnĂŠes")
+    print("Génération des donnĂŠes")
 
     xtrain, ytrain,ztrain = generateur(N,T,qualite_annotateurs,noise_truth)
     xtest, ytest,ztest = generateur(N,T,qualite_annotateurs,noise_truth)
@@ -397,12 +410,12 @@ def LearnfromtheCrowd2(N,T, d, modele,qualite_annotateurs, generateur, classifie
     print("Score en Train : ", S.score(xtrain,ztrain))
     print("")
     plot_data(xtrain,S.predict(xtrain))
-    plt.title("PrĂŠdictions finales sur le Train après crowdlearning")
+    plt.title("Prédictions finales sur le Train après crowdlearning")
     plt.show()
     print("Performances sur les données de test : ")
     print("Score en Test : ", S.score(xtest,ztest))
     plot_data(xtest,S.predict(xtest))
-    plt.title("PrĂŠdictions finales sur le Test")
+    plt.title("Prédictions finales sur le Test")
     plt.show()
 
 def drawScoreQuality(s, f=create_class_and_learn, classifier=LearnCrowd, N_MC=1):
@@ -430,7 +443,7 @@ def drawScoreQuality(s, f=create_class_and_learn, classifier=LearnCrowd, N_MC=1)
         scoreMtest = 0
         scoreCtest = 0
         for i in range(N_MC):
-            Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth)
+            Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth,data_type=1)
             xtrain=Vect[0]
             ytrain=Vect[1]
             ztrain=Vect[2]
@@ -495,7 +508,7 @@ def drawScoreAnnotateurs(s, f=create_class_and_learn, classifier=LearnCrowd, N_M
         scoreMtest = 0
         scoreCtest = 0
         for i in range(N_MC):
-            Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth)
+            Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth,data_type=1)
             xtrain=Vect[0]
             ytrain=Vect[1]
             ztrain=Vect[2]
@@ -562,7 +575,7 @@ def drawScorePropExperts(s, slicing, f=create_class_and_learn, classifier=LearnC
         scoreMtest = 0
         scoreCtest = 0
         for i in range(N_MC):
-            Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth)
+            Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth,data_type=1)
             xtrain=Vect[0]
             ytrain=Vect[1]
             ztrain=Vect[2]
@@ -637,6 +650,7 @@ def regularisation(classifier):
 
 def nb_donnees(classifier):
     global N
+
     Nb=np.array([XX.shape[0]*0.5,XX.shape[0]*0.6,XX.shape[0]*0.7,XX.shape[0]*0.8])
     S = classifier(T,N,d)
     M=MajorityVoting()
@@ -677,13 +691,16 @@ def nb_donnees(classifier):
     plt.show()
 
 def traceTrueData(classifier):
+    xtrain,ytrain,ztrain,xtest,ytest,ztest = giveTrueData()
+    T = ytrain.shape[1]
+    N = xtrain.shape[0]
+    d = xtrain.shape[1]
     S = classifier(T,N,d)
     M = MajorityVoting()
     C = Classifier_RegLog()
 
-    S.fit(xtrain, ytrain, max_iter=200,draw_convergence=False)
+    S.fit(xtrain, ytrain, max_iter=100,draw_convergence=True)
     C.fit(xtrain,ztrain,0.005,1000,affiche=False)
 
-    predicts(2,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,0.5,affiche=True)
-
+    predicts(2,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,0.5,affiche=False)
     trace_ROC(S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest)

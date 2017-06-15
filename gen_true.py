@@ -26,4 +26,4 @@ def genereWithoutMissing(Xmissing,Ymissing, Zmissing):
             X.append(Xmissing[i])
             Y.append(Ymissing[i])
             Z.append(Zmissing[i])
-    return np.array(X).astype(int), (np.array(Y).astype(int)+1)/2, (np.array(Z).astype(int)+1)/2
+    return (np.array(X).astype(int)), ((np.array(Y).astype(int)+1)/2), ((np.array(Z).astype(int)+1)/2)

@@ -18,17 +18,17 @@ from resultFunctions import *
 
 # learn_cas_unif_x(create_class_and_learn)
 #learn_cas_unif_x(create_class_and_learn2)
-#learn_cas_depend_x()
+# learn_cas_depend_x(N_MC=10)
 # traceTrueData(LearnCrowd)
 
 # Courbe (a) sharelatex :
 #
 # drawScoreQuality(0.5,N_MC=5)
-# drawScoreAnnotateurs(0.5,N_MC=3)
-# drawScorePropExperts(0.5,2,N_MC=3)
+# drawScoreAnnotateurs(0.5,N_MC=5)
+# drawScorePropExperts(0.5,2,N_MC=5)
 
 # specialisedAnnotators()
-compareNoneSpecialised()
+# compareNoneSpecialised()
 
 """
 Résumé des constantes à prendre :

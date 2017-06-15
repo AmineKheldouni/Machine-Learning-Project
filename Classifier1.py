@@ -58,18 +58,15 @@ class LearnCrowd:
 
         y_cond_z = self.y_cond_z(X, Y, gamma, w)
         mat_z_cond_x = self.z_cond_x(X, alpha, beta)
-
         results = np.multiply(np.prod(y_cond_z,axis=1),mat_z_cond_x)
-
-        s = results[:,0] + results[:,1]
-        results[:,0] = results[:,0]/s
-        results[:,1] = results[:,1]/s
-
-        # traite = lambda x:traite_zero(x)
-        # traite = np.vectorize(traite)
-        # sum = traite(sum)
-        # results[:,0] = np.multiply(results[:,0],1/sum)
-        # results[:,1] = np.multiply(results[:,1],1/sum)
+        # s = results[:,0] + results[:,1]
+        # results[:,0] = results[:,0]
+        # results[:,1] = results[:,1]
+        # # traite = lambda x:traite_zero(x)
+        # # traite = np.vectorize(traite)
+        # # sum = traite(sum)
+        # # results[:,0] = np.multiply(results[:,0],1/sum)
+        # # results[:,1] = np.multiply(results[:,1],1/sum)
         return results
 
     def likelihood(self, Pt, X, Y, model, alpha, beta, gamma, w):
@@ -87,8 +84,8 @@ class LearnCrowd:
         mat_z_cond_x = self.z_cond_x(X, alpha, beta)
 
         esp = np.zeros((N,T))
-        esp += np.multiply(Pt[:,1].reshape((-1,1)),np.log(y_cond_z[:,:,1])+np.log(mat_z_cond_x[:,1]).reshape((-1,1)))
-        esp += np.multiply(Pt[:,0].reshape((-1,1)),np.log(y_cond_z[:,:,0])+np.log(mat_z_cond_x[:,0]).reshape((-1,1)))
+        esp += np.multiply(Pt[:,1].reshape((-1,1)),np.log(y_cond_z[:,:,1]+pow(10,-10))+np.log(mat_z_cond_x[:,1]+pow(10,-10)).reshape((-1,1)))
+        esp += np.multiply(Pt[:,0].reshape((-1,1)),np.log(y_cond_z[:,:,0]+pow(10,-10))+np.log(mat_z_cond_x[:,0]+pow(10,-10)).reshape((-1,1)))
 
         return np.sum(esp) - self.lb * np.linalg.norm(w)**2
 
@@ -135,6 +132,7 @@ class LearnCrowd:
         (N,T)=np.shape(Y)
 
         tmp_exp = np.exp(-np.dot(X,alpha.T)-beta)
+
         mat = np.multiply(np.multiply(Pt[:,1].reshape((-1,1)),tmp_exp) - Pt[:,0].reshape((-1,1)),1/(1+tmp_exp))
         grad_lh_alpha = T*np.sum(mat.reshape((-1,1))*X,axis=0) #Taille 1,d
         grad_lh_beta = T*np.sum(mat.reshape((-1,1)),axis=0)  #Taille 1
@@ -168,7 +166,9 @@ class LearnCrowd:
         (N,T)=np.shape(Y)
 
         tmp_exp = np.exp(-np.dot(X,alpha.T)-beta)
+
         mat = np.multiply(np.multiply(Pt[:,1].reshape((-1,1)),tmp_exp) - Pt[:,0].reshape((-1,1)),1/(1+tmp_exp))
+        print(np.mean(mat))
         grad_lh_alpha = T*np.sum(mat.reshape((-1,1))*X,axis=0) #Taille 1,d
         grad_lh_beta = T*np.sum(mat.reshape((-1,1)),axis=0)  #Taille 1
 
@@ -248,7 +248,7 @@ class LearnCrowd:
             betaNew = float(Theta_init[d:d+1])
             gammaNew = Theta_init[d+1:d+1+T].reshape((1,T))
             wNew = Theta_init[d+1+T:d+1+T+d*T].reshape((d,T))
-            LH.append(np.linalg.norm(self.alpha - alphaNew)**2 + np.linalg.norm(self.beta - betaNew)**2)
+            LH.append(self.likelihood(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew))
 
         self.alpha = alphaNew
         self.beta = betaNew
@@ -262,7 +262,7 @@ class LearnCrowd:
             plt.plot(np.linspace(1,cpt_iter,cpt_iter),LH)
             plt.title("Convergence de l'EM")
             plt.show()
-    def fit(self, X, Y, epsGrad=10**(-5), model="Bernoulli", eps = 10**(-8), max_iter=10, draw_convergence=False):
+    def fit(self, X, Y, epsGrad=10**(-7), model="Bernoulli", eps = 10**(-8), max_iter=100, draw_convergence=False):
         N = X.shape[0]
         d = X.shape[1]
         T = Y.shape[1]
@@ -271,12 +271,18 @@ class LearnCrowd:
 
         #Initialization
 
-        self.alpha = np.zeros((1,d))
-        self.beta = 0
         alphaNew = np.random.rand(1,d)
         betaNew = np.random.rand()
         wNew = np.random.rand(d,T)
         gammaNew = np.random.rand(1,T)
+
+        self.alpha = np.zeros((1,d))
+        self.beta = 0
+
+        # alphaNew = np.random.rand(1,d)*10
+        # betaNew = np.random.rand()*10
+        # wNew = np.random.rand(d,T)*50
+        # gammaNew = np.random.rand(1,T)*50
 
         cpt_iter=0
         LH = []
@@ -285,11 +291,10 @@ class LearnCrowd:
         normGrad = np.linalg.norm(self.grad_likelihood(Pt, X, Y, model, self.alpha, self.beta, self.gamma, self.w))
 
         # while ( np.linalg.norm(self.alpha - alphaNew)**2 + np.linalg.norm(self.beta - betaNew)**2 > eps and cpt_iter < max_iter):
-        while ( normGrad > epsGrad and cpt_iter < max_iter):
+        while (normGrad > epsGrad and cpt_iter < max_iter):
 
 
             print("ITERATION N°",cpt_iter)
-            print("Norme du gradient : ", normGrad)
 
             self.alpha = alphaNew
             self.beta = betaNew
@@ -318,7 +323,7 @@ class LearnCrowd:
             wNew += step * Gw
             cpt_iter+=1
 
-            LH.append(np.linalg.norm(self.alpha - alphaNew)**2 + np.linalg.norm(self.beta - betaNew)**2)
+            LH.append(self.likelihood(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew))
 
         self.alpha = alphaNew
         self.beta = betaNew
@@ -328,10 +333,12 @@ class LearnCrowd:
         if draw_convergence:
             plt.plot(np.linspace(1,cpt_iter,cpt_iter),LH)
             plt.title("Convergence de l'EM")
+            plt.xlabel("nombre d'itérations")
+            plt.ylabel("log-vraisemblance")
             plt.show()
 
 
-    def fitNoW(self, X, Y, epsGrad=10**(-5), model="Bernoulli", eps = 10**(-8), max_iter=10, draw_convergence=False):
+    def fitNoW(self, X, Y, epsLH=10**(-5), model="Bernoulli", eps = 10**(-8), max_iter=100, draw_convergence=False):
         N = X.shape[0]
         d = X.shape[1]
         T = Y.shape[1]
@@ -349,18 +356,16 @@ class LearnCrowd:
         gammaNew = np.random.rand(1,T)*2
 
         cpt_iter=0
-        LH = []
-        #if model=="Bernoulli":
         Pt = self.expects_labels_Bernoulli(X, Y, self.alpha, self.beta, self.gamma, self.w)
+        LH = [self.likelihood(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew)]
         normGrad = np.linalg.norm(self.grad_likelihood(Pt, X, Y, model, self.alpha, self.beta, self.gamma, self.w))
-
+        tmp_LH = 1
         # while ( np.linalg.norm(self.alpha - alphaNew)**2 + np.linalg.norm(self.beta - betaNew)**2 > eps and cpt_iter < max_iter):
-        while ( normGrad > epsGrad and cpt_iter < max_iter):
+        while ( abs(LH[cpt_iter]-tmp_LH) > epsLH and cpt_iter < max_iter):
 
 
             print("ITERATION N°",cpt_iter)
             print("Norme du gradient : ", normGrad)
-
             self.alpha = alphaNew
             self.beta = betaNew
             self.gamma = gammaNew
@@ -384,9 +389,11 @@ class LearnCrowd:
             alphaNew += step * Galpha
             betaNew += step * Gbeta
             gammaNew += step * Ggamma
+
+            tmp_LH = LH[cpt_iter]
             cpt_iter+=1
 
-            LH.append(np.linalg.norm(self.alpha - alphaNew)**2 + np.linalg.norm(self.beta - betaNew)**2)
+            LH.append(self.likelihood(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew))
 
         self.alpha = alphaNew
         self.beta = betaNew
