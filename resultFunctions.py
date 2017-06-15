@@ -215,17 +215,17 @@ def trace_ROC(S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest):
         FP_test_class.append(fp)
 
     plt.scatter(FP_train_labelleurs,TP_train_labelleurs)
-    plt.scatter(FP_train_crowd,TP_train_crowd,color="blue")
-    plt.plot(FP_train_majority,TP_train_majority,color="red")
-    plt.plot(FP_train_class,TP_train_class,color="yellow")
-    plt.title("ROC trainset crowdlearning (bleu), majority voting (rouge), classifier truth (yellow)")
+    plt.scatter(FP_train_crowd,TP_train_crowd,color="blue",label="ROC trainset CrowdLearning ")
+    plt.plot(FP_train_majority,TP_train_majority,color="red",label="ROC trainset MajorityVoting")
+    plt.plot(FP_train_class,TP_train_class,color="yellow",label="ROC trainset  CrowdLearning Unsupervised")
+    plt.legend(bbox_to_anchor=(1, 1.14), loc=1, borderaxespad=0.)
     plt.show()
 
     plt.scatter(FP_test_labelleurs,TP_test_labelleurs)
-    plt.scatter(FP_test_crowd,TP_test_crowd,color="blue")
-    plt.plot(FP_test_majority,TP_test_majority,color="red")
-    plt.plot(FP_test_class,TP_test_class,color="yellow")
-    plt.title("ROC testset crowdlearning (bleu), majority voting (rouge), classifier truth (yellow)")
+    plt.scatter(FP_test_crowd,TP_test_crowd,color="blue",label="ROC testset crowdlearning")
+    plt.plot(FP_test_majority,TP_test_majority,color="red",label="ROC testset majorityVoting")
+    plt.plot(FP_test_class,TP_test_class,color="yellow",label="ROC testset CrowdLearning Unsupervised")
+    plt.legend(bbox_to_anchor=(1, 1.14), loc=1, borderaxespad=0.)
     plt.show()
 
 #VII. EXPERIENCES
@@ -234,12 +234,12 @@ def learn_cas_unif_x(f=create_class_and_learn):
     N = 100 #nb données
     T = 5 #nb annotateurs
     d = 2 #nb dimension des données : pas modifiable (gen_arti ne génère que des données de dimension 2)
-    noise_truth= 0.6 #bruit sur l'attribution des vrais labels gaussiens sur les données 2D (on pourrait aussi jouer sur ecart-type gaussienne avec sigma)
+    noise_truth= 0.7 #bruit sur l'attribution des vrais labels gaussiens sur les données 2D (on pourrait aussi jouer sur ecart-type gaussienne avec sigma)
     modele= "Bernoulli"
 
     qualite_annotateurs_Bernoulli=[(0.6, 0.6)]*T #Proba que l'annotateur ait raison
     #qualite_annotateurs_Bernoulli=[[0.6,0.6],[0.6,0.6],[0.6,0.6],[0.7,0.7],[0.9,0.9]]
-    Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth)
+    Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth,data_type=1,affiche=True)
 
     xtrain=Vect[0]
     ytrain=Vect[1]
@@ -253,6 +253,66 @@ def learn_cas_unif_x(f=create_class_and_learn):
     predicts(2,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,0.5,affiche=True)
     trace_ROC(S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest)
 
+def specialisedAnnotators(f=create_class_and_learn):
+    N = 100 #nb données
+    T = 2 #nb annotateurs
+    d = 2 #nb dimension des données : pas modifiable (gen_arti ne génère que des données de dimension 2)
+    noise_truth= 0.5 #bruit sur l'attribution des vrais labels gaussiens sur les données 2D (on pourrait aussi jouer sur ecart-type gaussienne avec sigma)
+    modele= "Bernoulli"
+    qualite_annotateurs_Bernoulli = [[0.4,0.6],[0.9,0.1]]
+
+    Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth,affiche=True,data_type=1)
+
+    xtrain=Vect[0]
+    ytrain=Vect[1]
+    ztrain=Vect[2]
+    xtest=Vect[3]
+    ytest=Vect[4]
+    ztest=Vect[5]
+    S,M,C = f(xtrain,ytrain,ztrain)
+    SCORES=predicts(1,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,0.5,affiche=True)
+
+    trace_ROC(S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest)
+
+def compareNoneSpecialised(f=create_class_and_learn):
+    N = 100 #nb données
+    T = 2 #nb annotateurs
+    d = 2 #nb dimension des données : pas modifiable (gen_arti ne génère que des données de dimension 2)
+    noise_truth= 0.65 #bruit sur l'attribution des vrais labels gaussiens sur les données 2D (on pourrait aussi jouer sur ecart-type gaussienne avec sigma)
+    modele= "Bernoulli"
+
+    qualite_annotateurs_Bernoulli = [(0.9,0.1),(0.4,0.6)]
+    #qualite_annotateurs_Bernoulli=[[0.6,0.6],[0.6,0.6],[0.6,0.6],[0.7,0.7],[0.9,0.9]]
+    Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth,data_type=0,affiche=True)
+
+    xtrain=Vect[0]
+    ytrain=Vect[1]
+    ztrain=Vect[2]
+    xtest=Vect[3]
+    ytest=Vect[4]
+    ztest=Vect[5]
+
+    S,M,C = f(xtrain,ytrain,ztrain,draw_convergence=True)
+    (N,d)=np.shape(xtrain)
+    (N,T)=np.shape(ytrain)
+
+    S_now = LearnCrowd(T,N,d)
+
+    print("Apprentissage")
+    S_now.fitNoW(xtrain,ytrain,draw_convergence=False)
+
+    sNoW_train_LearnCrowd=S_now.score(xtrain,ztrain,0.5)
+
+    print("Performances sur les données d'entrainement (non supervisé) : ")
+    print("Score en Train : ",sNoW_train_LearnCrowd)
+    sNoW_test_LearnCrowd=S_now.score(xtest,ztest,0.5)
+
+    print("Performances sur les données de test (non supervisé): ")
+    print("Score en Test : ", sNoW_test_LearnCrowd)
+
+    predicts(2,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,0.5,affiche=True)
+
+    trace_ROC(S,M,S_now,xtrain,ytrain,ztrain,xtest,ytest,ztest)
 
 def learn_cas_depend_x(f=create_class_and_learn):
 

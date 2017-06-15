@@ -16,17 +16,19 @@ from resultFunctions import *
 
 #LearnfromtheCrowd2(N,T,d,modele,qualite_annoteur,generation_Bernouilli,noise_truth)
 
-learn_cas_unif_x(create_class_and_learn)
+# learn_cas_unif_x(create_class_and_learn)
 #learn_cas_unif_x(create_class_and_learn2)
 #learn_cas_depend_x()
 # traceTrueData(LearnCrowd)
 
 # Courbe (a) sharelatex :
+#
+# drawScoreQuality(0.5,N_MC=5)
+# drawScoreAnnotateurs(0.5,N_MC=3)
+# drawScorePropExperts(0.5,2,N_MC=3)
 
-drawScoreQuality(0.5,N_MC=5)
-drawScoreAnnotateurs(0.5,N_MC=3)
-drawScorePropExperts(0.5,2,N_MC=3)
-
+# specialisedAnnotators()
+compareNoneSpecialised()
 
 """
 Résumé des constantes à prendre :

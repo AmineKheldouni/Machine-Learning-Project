@@ -262,7 +262,7 @@ class LearnCrowd:
             plt.plot(np.linspace(1,cpt_iter,cpt_iter),LH)
             plt.title("Convergence de l'EM")
             plt.show()
-    def fit(self, X, Y, epsGrad=10**(-5), model="Bernoulli", eps = 10**(-8), max_iter=100, draw_convergence=False):
+    def fit(self, X, Y, epsGrad=10**(-5), model="Bernoulli", eps = 10**(-8), max_iter=10, draw_convergence=False):
         N = X.shape[0]
         d = X.shape[1]
         T = Y.shape[1]
@@ -273,8 +273,8 @@ class LearnCrowd:
 
         self.alpha = np.zeros((1,d))
         self.beta = 0
-        alphaNew = np.ones((1,d))*(0.4)
-        betaNew = 0.1
+        alphaNew = np.random.rand(1,d)
+        betaNew = np.random.rand()
         wNew = np.random.rand(d,T)
         gammaNew = np.random.rand(1,T)
 
@@ -330,6 +330,72 @@ class LearnCrowd:
             plt.title("Convergence de l'EM")
             plt.show()
 
+
+    def fitNoW(self, X, Y, epsGrad=10**(-5), model="Bernoulli", eps = 10**(-8), max_iter=10, draw_convergence=False):
+        N = X.shape[0]
+        d = X.shape[1]
+        T = Y.shape[1]
+
+        #EM Algorithm
+
+        #Initialization
+
+        self.alpha = np.zeros((1,d))
+        self.beta = 0
+        self.w = 0
+        alphaNew = np.random.rand(1,d)*2
+        betaNew = np.random.rand()*2
+        wNew = np.zeros((d,T))
+        gammaNew = np.random.rand(1,T)*2
+
+        cpt_iter=0
+        LH = []
+        #if model=="Bernoulli":
+        Pt = self.expects_labels_Bernoulli(X, Y, self.alpha, self.beta, self.gamma, self.w)
+        normGrad = np.linalg.norm(self.grad_likelihood(Pt, X, Y, model, self.alpha, self.beta, self.gamma, self.w))
+
+        # while ( np.linalg.norm(self.alpha - alphaNew)**2 + np.linalg.norm(self.beta - betaNew)**2 > eps and cpt_iter < max_iter):
+        while ( normGrad > epsGrad and cpt_iter < max_iter):
+
+
+            print("ITERATION N°",cpt_iter)
+            print("Norme du gradient : ", normGrad)
+
+            self.alpha = alphaNew
+            self.beta = betaNew
+            self.gamma = gammaNew
+
+
+            # Expectation (E-step)
+
+            #if model=="Bernoulli":
+            Pt = self.expects_labels_Bernoulli(X, Y, self.alpha, self.beta, self.gamma, self.w)
+            #elif model=="Gaussian":
+            #Pt = self.expects_labels_Gaussian(X, Y, self.alpha, self.beta, self.gamma, self.w)
+
+            #print(Pt)
+            # Maximization (M-step)
+
+            # "Zippage" de self.alpha, self.beta, self.gamma, self.w en un grand vecteur Teta
+            Galpha, Gbeta, Ggamma, Gw = self.grad_likelihood_V2(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew)
+            normGrad = np.linalg.norm(Galpha)+np.linalg.norm(Gbeta)+np.linalg.norm(Ggamma)+np.linalg.norm(Gw)
+
+            step = 0.01/((cpt_iter+1))**2
+            alphaNew += step * Galpha
+            betaNew += step * Gbeta
+            gammaNew += step * Ggamma
+            cpt_iter+=1
+
+            LH.append(np.linalg.norm(self.alpha - alphaNew)**2 + np.linalg.norm(self.beta - betaNew)**2)
+
+        self.alpha = alphaNew
+        self.beta = betaNew
+        self.gamma = gammaNew
+        #print("############ Test BFGS #######################")
+        if draw_convergence:
+            plt.plot(np.linspace(1,cpt_iter,cpt_iter),LH)
+            plt.title("Convergence de l'EM")
+            plt.show()
 
     def predict(self, X, seuil):
         #on prédit les vrais labels à partir des données X

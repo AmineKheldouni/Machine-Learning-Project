@@ -21,8 +21,8 @@ def gen_arti(centerx=1,centery=1,sigma=0.1,nbex=1000,data_type=0,epsilon=0.02):
         y=np.hstack((np.ones(nbex//2),-np.ones(nbex//2)))
     if data_type==1:
         #melange de 4 gaussiennes
-        xpos=np.vstack((np.random.multivariate_normal([centerx,centerx],np.diag([sigma,sigma]),int(nbex//4)),np.random.multivariate_normal([-centerx,-centerx],np.diag([sigma,sigma]),int(nbex/4))))
-        xneg=np.vstack((np.random.multivariate_normal([-centerx,centerx],np.diag([sigma,sigma]),int(nbex//4)),np.random.multivariate_normal([centerx,-centerx],np.diag([sigma,sigma]),int(nbex/4))))
+        xpos=np.vstack((np.random.multivariate_normal([centerx,centerx],np.diag([sigma,sigma]),int(nbex//4)),np.random.multivariate_normal([-centerx,centerx],np.diag([sigma,sigma]),int(nbex/4))))
+        xneg=np.vstack((np.random.multivariate_normal([centerx,-centerx],np.diag([sigma,sigma]),int(nbex//4)),np.random.multivariate_normal([-centerx,-centerx],np.diag([sigma,sigma]),int(nbex/4))))
         data=np.vstack((xpos,xneg))
         y=np.hstack((np.ones(nbex//2),-np.ones(int(nbex//2))))
 
@@ -97,11 +97,11 @@ def modifie_label_Bernoulli(label,proba):
         label_res=1-label
     return label_res
 
-def generation_Bernoulli(N,T,qualite_annotateur_Bernoulli,noise_truth):
+def generation_Bernoulli(N,T,qualite_annotateur_Bernoulli,noise_truth,data_type=0):
     """retourne en xtrain les données de dimension 2, en ytrain les annotations, en ztrain les vrais labels
     avec pour qualite_annotateurs une liste contenant les probabilités de succès de chaque annotateur TP,TN
     noise_truth est le bruit de l'attribution des vrais labels gaussiens sur les données"""
-    xtrain,ztrain = gen_arti(nbex=N,data_type=0,epsilon=noise_truth) #vrai labels non bruités
+    xtrain,ztrain = gen_arti(nbex=N,data_type=data_type,epsilon=noise_truth) #vrai labels non bruités
     ztrain=(ztrain+1)/2
     ytrain=np.zeros((N,T)) #changement des labels
     for t in range(T):
@@ -161,7 +161,7 @@ def generation_Bernoulli_xdepend(N,T,qualite_annotateur_Bernoulli,noise_truth):
 
 #III. GENERATION DE X,Y,Z
 
-def genere(N,T,d,modele,qualite_annotateurs,generateur,noise_truth,affiche=False):
+def genere(N,T,d,modele,qualite_annotateurs,generateur,noise_truth,affiche=False, data_type=0):
     print("Rappel des paramètres")
     print("Nombre de données générées : ", N)
     print("Nombre de dimensions des données générées : ", d)
@@ -172,8 +172,8 @@ def genere(N,T,d,modele,qualite_annotateurs,generateur,noise_truth,affiche=False
 
     print("Génération des données")
 
-    xtrain, ytrain,ztrain = generateur(N,T,qualite_annotateurs,noise_truth)
-    xtest, ytest,ztest = generateur(N,T,qualite_annotateurs,noise_truth)
+    xtrain, ytrain,ztrain = generateur(N,T,qualite_annotateurs,noise_truth,data_type=data_type)
+    xtest, ytest,ztest = generateur(N,T,qualite_annotateurs,noise_truth,data_type=data_type)
 
     #print("Données d'entrainement")
     #print("Données X : ", xtrain)
