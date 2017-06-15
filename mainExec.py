@@ -28,7 +28,7 @@ from resultFunctions import *
 # drawScorePropExperts(0.5,2,N_MC=5)
 
 # specialisedAnnotators()
-# compareNoneSpecialised()
+compareNoneSpecialised()
 
 """
 Résumé des constantes à prendre :

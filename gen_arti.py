@@ -147,10 +147,10 @@ def modifie_label_Bernoulli_xdepend(data,label,proba):
            label_res=1-label
     return label_res
 
-def generation_Bernoulli_xdepend(N,T,qualite_annotateur_Bernoulli,noise_truth):
+def generation_Bernoulli_xdepend(N,T,qualite_annotateur_Bernoulli,noise_truth,data_type=0):
     """retourne en xtrain les données de dimension 2, en ytrain les annotations, en ztrain les vrais labels
     avec pour qualite_annotateur_Bernoulli les probabilités de succès de chaque annotateur dans chaque zone"""
-    xtrain,ztrain = gen_arti(nbex=N,data_type=0,epsilon=noise_truth) #vrai labels non bruités
+    xtrain,ztrain = gen_arti(nbex=N,data_type=data_type,epsilon=noise_truth) #vrai labels non bruités
     ztrain=(ztrain+1)/2
     ytrain=np.zeros((N,T)) #changement des labels
     for t in range(T):

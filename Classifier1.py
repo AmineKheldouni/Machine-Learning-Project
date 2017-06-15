@@ -168,7 +168,6 @@ class LearnCrowd:
         tmp_exp = np.exp(-np.dot(X,alpha.T)-beta)
 
         mat = np.multiply(np.multiply(Pt[:,1].reshape((-1,1)),tmp_exp) - Pt[:,0].reshape((-1,1)),1/(1+tmp_exp))
-        print(np.mean(mat))
         grad_lh_alpha = T*np.sum(mat.reshape((-1,1))*X,axis=0) #Taille 1,d
         grad_lh_beta = T*np.sum(mat.reshape((-1,1)),axis=0)  #Taille 1
 
@@ -271,6 +270,8 @@ class LearnCrowd:
 
         #Initialization
 
+        # ArtificialData Initialization
+
         alphaNew = np.random.rand(1,d)
         betaNew = np.random.rand()
         wNew = np.random.rand(d,T)
@@ -279,6 +280,7 @@ class LearnCrowd:
         self.alpha = np.zeros((1,d))
         self.beta = 0
 
+        # TrueData Initialization
         # alphaNew = np.random.rand(1,d)*10
         # betaNew = np.random.rand()*10
         # wNew = np.random.rand(d,T)*50
@@ -304,15 +306,10 @@ class LearnCrowd:
 
             # Expectation (E-step)
 
-            #if model=="Bernoulli":
             Pt = self.expects_labels_Bernoulli(X, Y, self.alpha, self.beta, self.gamma, self.w)
-            #elif model=="Gaussian":
-            #Pt = self.expects_labels_Gaussian(X, Y, self.alpha, self.beta, self.gamma, self.w)
 
-            #print(Pt)
             # Maximization (M-step)
 
-            # "Zippage" de self.alpha, self.beta, self.gamma, self.w en un grand vecteur Teta
             Galpha, Gbeta, Ggamma, Gw = self.grad_likelihood_V2(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew)
             normGrad = np.linalg.norm(Galpha)+np.linalg.norm(Gbeta)+np.linalg.norm(Ggamma)+np.linalg.norm(Gw)
 
@@ -329,7 +326,7 @@ class LearnCrowd:
         self.beta = betaNew
         self.gamma = gammaNew
         self.w = wNew
-        #print("############ Test BFGS #######################")
+
         if draw_convergence:
             plt.plot(np.linspace(1,cpt_iter,cpt_iter),LH)
             plt.title("Convergence de l'EM")
@@ -343,17 +340,15 @@ class LearnCrowd:
         d = X.shape[1]
         T = Y.shape[1]
 
-        #EM Algorithm
-
         #Initialization
 
         self.alpha = np.zeros((1,d))
         self.beta = 0
-        self.w = 0
-        alphaNew = np.random.rand(1,d)*2
-        betaNew = np.random.rand()*2
-        wNew = np.zeros((d,T))
-        gammaNew = np.random.rand(1,T)*2
+        self.w = np.zeros((d,T))
+        alphaNew = np.random.rand(1,d)*7
+        betaNew = np.random.rand()*10
+        wNew = np.ones((d,T))*5
+        gammaNew = np.random.rand(1,T)*10
 
         cpt_iter=0
         Pt = self.expects_labels_Bernoulli(X, Y, self.alpha, self.beta, self.gamma, self.w)
@@ -400,7 +395,7 @@ class LearnCrowd:
         self.gamma = gammaNew
         #print("############ Test BFGS #######################")
         if draw_convergence:
-            plt.plot(np.linspace(1,cpt_iter,cpt_iter),LH)
+            plt.plot(np.linspace(0,cpt_iter,cpt_iter+1),LH)
             plt.title("Convergence de l'EM")
             plt.show()
 

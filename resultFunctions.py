@@ -6,6 +6,7 @@ from reglogClassifier import *
 from majorityVoting import *
 from Classifier1 import *
 from Classifier2 import *
+from Classifier3 import *
 
 
 def create_class_and_learn(xtrain,ytrain,ztrain,classifier=LearnCrowd,draw_convergence=False):
@@ -229,6 +230,102 @@ def trace_ROC(S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest):
     plt.legend(bbox_to_anchor=(1, 1.14), loc=1, borderaxespad=0.)
     plt.show()
 
+def trace_ROC_Unsupervised(S,M,C,S_unsup,xtrain,ytrain,ztrain,xtest,ytest,ztest):
+    """ trace les courbes ROC pour le modèle learning from the Crowd avec predict(X),
+    compare avec un classifieur sur Z, compare avec un majority voting,
+    place aussi les FP et TP de chaque labelleur // ground truth"""
+
+    (N,d)=np.shape(xtrain)
+    (N,T)=np.shape(ytrain)
+
+    #print("TP et FP de chaque annotateur")
+    TP_train_labelleurs=[]
+    FP_train_labelleurs=[]
+    for t in range(T):
+        tp,fp = TP_FP(ytrain[:,t],ztrain)
+        TP_train_labelleurs.append(tp)
+        FP_train_labelleurs.append(fp)
+
+    #print("TP et FP de chaque annotateur")
+    TP_test_labelleurs=[]
+    FP_test_labelleurs=[]
+    for t in range(T):
+        tp,fp = TP_FP(ytest[:,t],ztest)
+        TP_test_labelleurs.append(tp)
+        FP_test_labelleurs.append(fp)
+
+    seuils=[0.001*k for k in range(1001)]
+    seuils.append(np.inf)
+    TP_train_crowd=[]
+    FP_train_crowd=[]
+    TP_test_crowd=[]
+    FP_test_crowd=[]
+
+    TP_train_crowd_unsup=[]
+    FP_train_crowd_unsup=[]
+    TP_test_crowd_unsup=[]
+    FP_test_crowd_unsup=[]
+
+    TP_train_majority=[]
+    FP_train_majority=[]
+    TP_test_majority=[]
+    FP_test_majority=[]
+
+    TP_train_class=[]
+    FP_train_class=[]
+    TP_test_class=[]
+    FP_test_class=[]
+
+    for s in seuils:
+        PREDICTS = predicts(0,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,s)
+        s_train_LearnCrowd_unsup=S_unsup.predict(xtrain,s)
+        s_test_LearnCrowd_unsup=S_unsup.predict(xtest,s)
+
+        tp,fp=TP_FP(PREDICTS[0],ztrain)
+        #print(PREDICTS[0],ztrain)
+        TP_train_crowd.append(tp)
+        FP_train_crowd.append(fp)
+        tp,fp=TP_FP(PREDICTS[3],ztest)
+        TP_test_crowd.append(tp)
+        FP_test_crowd.append(fp)
+
+        tp,fp=TP_FP(PREDICTS[1],ztrain)
+        TP_train_majority.append(tp)
+        FP_train_majority.append(fp)
+        tp,fp=TP_FP(PREDICTS[4],ztest)
+        TP_test_majority.append(tp)
+        FP_test_majority.append(fp)
+
+        tp,fp=TP_FP(PREDICTS[2],ztrain)
+        TP_train_class.append(tp)
+        FP_train_class.append(fp)
+        tp,fp=TP_FP(PREDICTS[5],ztest)
+        TP_test_class.append(tp)
+        FP_test_class.append(fp)
+
+        tp,fp = TP_FP(s_train_LearnCrowd_unsup,ztrain)
+        TP_train_crowd_unsup.append(tp)
+        FP_train_crowd_unsup.append(fp)
+        tp,fp=TP_FP(s_test_LearnCrowd_unsup,ztest)
+        TP_test_crowd_unsup.append(tp)
+        FP_test_crowd_unsup.append(fp)
+
+    plt.scatter(FP_train_labelleurs,TP_train_labelleurs)
+    plt.scatter(FP_train_crowd,TP_train_crowd,color="blue",label="ROC trainset CrowdLearning (Supervised)")
+    plt.plot(FP_train_crowd_unsup,TP_train_crowd_unsup,color="green",label="ROC trainset CrowdLearning (Unsupervised)",linewidth=2.0,marker="^")
+    plt.plot(FP_train_majority,TP_train_majority,color="red",label="ROC trainset MajorityVoting")
+    plt.plot(FP_train_class,TP_train_class,color="yellow",label="ROC trainset  ClassifierTruth")
+    plt.legend(bbox_to_anchor=(1, 1.14), loc=1, borderaxespad=0.)
+    plt.show()
+
+    plt.scatter(FP_test_labelleurs,TP_test_labelleurs)
+    plt.scatter(FP_test_crowd,TP_test_crowd,color="blue",label="ROC testset CrowdLearning (Supervised)")
+    plt.plot(FP_test_crowd_unsup,TP_test_crowd_unsup,color="green",label="ROC trainset CrowdLearning (Unsupervised)",linewidth=2.0,marker="^")
+    plt.plot(FP_test_majority,TP_test_majority,color="red",label="ROC testset MajorityVoting")
+    plt.plot(FP_test_class,TP_test_class,color="yellow",label="ROC testset ClassifierTruth")
+    plt.legend(bbox_to_anchor=(1, 1.14), loc=1, borderaxespad=0.)
+    plt.show()
+
 #VII. EXPERIENCES
 
 def learn_cas_unif_x(f=create_class_and_learn):
@@ -240,7 +337,7 @@ def learn_cas_unif_x(f=create_class_and_learn):
 
     qualite_annotateurs_Bernoulli=[(0.6, 0.6)]*T #Proba que l'annotateur ait raison
     #qualite_annotateurs_Bernoulli=[[0.6,0.6],[0.6,0.6],[0.6,0.6],[0.7,0.7],[0.9,0.9]]
-    Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth,data_type=1,affiche=True)
+    Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth,data_type=0,affiche=False)
 
     xtrain=Vect[0]
     ytrain=Vect[1]
@@ -278,12 +375,12 @@ def compareNoneSpecialised(f=create_class_and_learn):
     N = 100 #nb données
     T = 2 #nb annotateurs
     d = 2 #nb dimension des données : pas modifiable (gen_arti ne génère que des données de dimension 2)
-    noise_truth= 0.65 #bruit sur l'attribution des vrais labels gaussiens sur les données 2D (on pourrait aussi jouer sur ecart-type gaussienne avec sigma)
+    noise_truth= 0.55 #bruit sur l'attribution des vrais labels gaussiens sur les données 2D (on pourrait aussi jouer sur ecart-type gaussienne avec sigma)
     modele= "Bernoulli"
 
-    qualite_annotateurs_Bernoulli = [(0.9,0.1),(0.4,0.6)]
-    #qualite_annotateurs_Bernoulli=[[0.6,0.6],[0.6,0.6],[0.6,0.6],[0.7,0.7],[0.9,0.9]]
-    Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth,data_type=1,affiche=True)
+    qualite_annotateurs_Bernoulli = [(0.9,0.55),(0.55,0.9)]
+    # qualite_annotateurs_Bernoulli=[[0.6,0.6],[0.6,0.6],[0.6,0.6],[0.7,0.7],[0.9,0.9]]
+    Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli_xdepend,noise_truth,data_type=True,affiche=False)
 
     xtrain=Vect[0]
     ytrain=Vect[1]
@@ -299,7 +396,7 @@ def compareNoneSpecialised(f=create_class_and_learn):
     S_now = LearnCrowd(T,N,d)
 
     print("Apprentissage")
-    S_now.fitNoW(xtrain,ytrain,draw_convergence=False)
+    S_now.fitNoW(xtrain,ytrain,draw_convergence=True)
 
     sNoW_train_LearnCrowd=S_now.score(xtrain,ztrain,0.5)
 
@@ -310,9 +407,9 @@ def compareNoneSpecialised(f=create_class_and_learn):
     print("Performances sur les données de test (non supervisé): ")
     print("Score en Test : ", sNoW_test_LearnCrowd)
 
-    predicts(2,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,0.5,affiche=True)
+    predicts(2,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,0.5,affiche=False)
 
-    trace_ROC(S,M,S_now,xtrain,ytrain,ztrain,xtest,ytest,ztest)
+    trace_ROC_Unsupervised(S,M,C,S_now,xtrain,ytrain,ztrain,xtest,ytest,ztest)
 
 def learn_cas_depend_x(f=create_class_and_learn,N_MC=1):
 
