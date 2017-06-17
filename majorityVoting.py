@@ -8,7 +8,7 @@ class MajorityVoting:
         pass
     def predict(self, Y,seuil):
         (N,T)=np.shape(Y)
-        predictions = np.sum(Y,axis=1)/T
+        predictions = np.mean(Y,axis=1)
         predictions = predictions > seuil
         return predictions
     def score(self, Y, Z,seuil):

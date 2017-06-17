@@ -137,7 +137,7 @@ class LearnCrowdOrder:
 
         return (grad_lh_alpha, grad_lh_beta, grad_lh_gamma, grad_lh_w, grad_lh_nu, grad_lh_S)
 
-    def fit(self, X, Y, epsGrad=10**(-7), model="Bernoulli", eps = 10**(-8), max_iter=100, draw_convergence=False):
+    def fit(self, X, Y, epsGrad=10**(-2), model="Bernoulli", eps = 10**(-8), max_iter=200, draw_convergence=False):
         N = X.shape[0]
         d = X.shape[1]
         T = Y.shape[1]
@@ -189,17 +189,25 @@ class LearnCrowdOrder:
             #print(Pt)
             # Maximization (M-step)
 
-            # "Zippage" de self.alpha, self.beta, self.gamma, self.w en un grand vecteur Teta
             Galpha, Gbeta, Ggamma, Gw, Gnu, Gs = self.grad_likelihood(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew, nuNew, sNew)
-            normGrad = np.linalg.norm(Galpha)+np.linalg.norm(Gbeta)+np.linalg.norm(Ggamma)+np.linalg.norm(Gw)
+            normGrad = np.linalg.norm(Galpha)+np.linalg.norm(Gbeta)+np.linalg.norm(Ggamma)+np.linalg.norm(Gw)+np.linalg.norm(Gnu)+np.linalg.norm(Gs)
+            grad_desc_count = 0
+            # print("MAXIMIZATION : ")
+            while (normGrad > epsGrad and grad_desc_count < 200):
+                # print("counter :", grad_desc_count)
+                # print("Norme Grad : ", normGrad)
+                step = 0.005/((grad_desc_count+1))**2
+                alphaNew += step * Galpha
+                betaNew += step * Gbeta
+                gammaNew += step * Ggamma
+                wNew += step * Gw
+                nuNew += step * Gnu
+                sNew += step * Gs
 
-            step = 0.01/((cpt_iter+1))**2
-            alphaNew += step * Galpha
-            betaNew += step * Gbeta
-            gammaNew += step * Ggamma
-            wNew += step * Gw
-            nuNew += step * Gnu
-            sNew += step * Gs
+                Galpha, Gbeta, Ggamma, Gw, Gnu, Gs = self.grad_likelihood(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew, nuNew, sNew)
+                normGrad = np.linalg.norm(Galpha)+np.linalg.norm(Gbeta)+np.linalg.norm(Ggamma)+np.linalg.norm(Gw)+np.linalg.norm(Gnu)+np.linalg.norm(Gs)
+                grad_desc_count += 1
+
             cpt_iter+=1
 
             LH.append(self.likelihood(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew, nuNew, sNew))

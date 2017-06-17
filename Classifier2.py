@@ -1,4 +1,12 @@
-from importModule import *
+# Modules importĂŠs
+
+import numpy as np
+import matplotlib.pyplot as plt
+from tools import *
+from scipy.optimize import minimize
+from random import gauss
+
+
 
 def sigmoide(x):
     return 1/(1+np.exp(-x))
@@ -7,7 +15,6 @@ sigmoide = np.vectorize(sigmoide)
 
 def calcule_ai(alpha, Y):
     T = Y.shape[0]
-    res=1
     ai = np.prod(np.multiply(alpha**Y, (1-alpha)**(1-Y)), axis = 1).reshape((T,1))
     return ai
     # for t in range(T):
@@ -16,61 +23,61 @@ def calcule_ai(alpha, Y):
 
 def calcule_bi(beta, Y):
     T=Y.shape[0]
-    res=1
     return np.prod(np.multiply(beta**(1-Y), (1-beta)**(Y)), axis = 1).reshape((T,1))
     # for t in range(T):
     #     res=res*(beta[0,t]**(1-yi[t]))*((1-beta[0,t])**(yi[t]))
     # return res
 
-
-def gradient_modele_w(X, mu, w, l):
-    N=np.shape(X)
-    d=np.shape(w)[0]
-    #vecteur_grad = np.zeros((d,1))
-    w=w.reshape((d,1))
+#calcul du gradient
+def gradient_modele(X, mu, w):
+    N=np.shape(X)[0]
+    d=np.shape(X)[1]
     vecteur_w_x = sigmoide(np.dot(X,w))
-    vecteur_addition = -mu+vecteur_w_x+1
+    vecteur_w_x=vecteur_w_x.reshape((N,1))
+    mu_inter=mu.reshape((-1,1))
+    vecteur_addition = mu_inter-vecteur_w_x
     Matrice_gradient = np.multiply(vecteur_addition,X)
     vecteur_res=np.sum(Matrice_gradient,axis=0)
     vecteur_res=vecteur_res.reshape((d,1))
     #remplacer vecteur_res-2*w pour avoir ridge regression
-    return np.ndarray.flatten(vecteur_res)
+    return vecteur_res
 
-
-
-def gradient_modele_amine(X, mu, w, l):
-    N=np.shape(X)
-    d=np.shape(w)[0]
-    #vecteur_grad = np.zeros((d,1))
-    w=w.reshape((d,1))
-    vecteur_w_x = sigmoide(np.dot(X,w))
-    vecteur_carre=vecteur_w_x**(2)
-    vecteur_addition=np.multiply(np.multiply(1/vecteur_w_x,mu)+np.multiply(1-mu,1/(1-vecteur_w_x)),np.multiply(np.exp(-np.dot(X,w)),vecteur_carre))
-    Matrice_gradient = np.multiply(vecteur_addition,X)
-    vecteur_res=np.sum(Matrice_gradient,axis=0)
-    vecteur_res=vecteur_res.reshape((d,1))
-    #remplacer vecteur_res-2*w pour avoir ridge regression
-    return np.ndarray.flatten(vecteur_res)
-
-def hessien_modele(X,w,l):
+#calcul de la hessienne
+def hessien_modele(X,w):
     N=X.shape[0]
-    d = w.shape[0]
+    d = X.shape[1]
     vecteur_w_x = sigmoide(np.dot(X,w))
-    Matrice_Hessienne=np.zeros((d,d))
+    vecteur_w_x=vecteur_w_x.reshape((-1,1))
     H = -np.multiply(np.multiply(vecteur_w_x,(1-vecteur_w_x)),X).T.dot(X)
     return H
-    # for i in range(N):
-    #     xi=X[i,:].reshape((d,1))
-    #     Matrice_Hessienne -= vecteur_w_x[i,0]*(1-vecteur_w_x[i,0])*np.dot(xi,xi.T)
-    # return Matrice_Hessienne
 
+def descente_gradient(w_init,X,mu,gradient_fonction,hessienne_fonction):
+    vecteur_gradient=gradient_fonction(X,mu,w_init)
+    Hessienne=hessienne_fonction(X,w_init)
+    w1=w_init
+    w0=w_init+10
+    nombre_iteration=1
+    while(np.linalg.norm(w1-w0)>1.0**(-4) and nombre_iteration<100):
+        w0=w1
+        coeff=0.1/np.sqrt(nombre_iteration)
+        vecteur_gradient=gradient_fonction(X,mu,w1)
+        Hessienne=hessienne_fonction(X,w1)
+        #if(np.linalg.det(Hessienne)==0):
+            #Hessienne=0.005*np.eye(X.shape[1],X.shape[1])
+        w1=w1-coeff*np.linalg.inv(Hessienne).dot(vecteur_gradient)
+        nombre_iteration+=1
+    return w1
+
+#classe du classifieur
 class LearnCrowd2:
     def __init__(self, T, N, d, l=0):
-        self.alpha = np.zeros((1,T)) # sensitivitĂŠ des annoteur
-        self.beta = np.zeros((1,T)) #specificitĂŠ
-        self.w = np.ones((d,1)) # Poids pour le modĂ¨le (indĂŠpendant des annoteur)
+        self.alpha = np.zeros((1,T)) # sensitivitÄĹ  des annoteur
+        self.beta = np.zeros((1,T)) #specificitÄĹ 
+        self.w = np.ones((d,1)) # Poids pour le modÄÂ¨le (indÄĹ pendant des annoteur)
         self.y_trouve=np.zeros((N,1))
+        #lambda de ridge regression
         self.lb = l
+        self.gamma="nothing"
 
     def likelihood(self, X, Y, alpha, beta, w, vrai_y):
         # vrai_y = mu_i
@@ -78,12 +85,12 @@ class LearnCrowd2:
         N = X.shape[0]
         T = Y.shape[1]
 
-        p_i = 1/(1+np.exp(-X.dot(w)))+1.0**(-10)
+        p_i = 1/(1+np.exp(-X.dot(w)))
         p_i = p_i.reshape((N,1))
         a_i = calcule_ai(alpha, Y)
         b_i = calcule_bi(alpha, Y)
-        pi_ai=np.multiply(p_i+1.0**(-10),a_i)
-        pi_bi=np.multiply((1-p_i+1.0**(-10)),b_i)
+        pi_ai=np.multiply(p_i,a_i)
+        pi_bi=np.multiply((1-p_i),b_i)
 
         #log_pi = np.log(p_i)
         #log_un_pi = np.log(1+1.0**(-10)-p_i)
@@ -102,7 +109,8 @@ class LearnCrowd2:
 
         return log_res
 
-    def fit(self, X, Y, model="Bernoulli", eps = 10**(-3), max_iter=200):
+    def fit(self, X, Y,epsGrad=10**(-5), model="Bernoulli", eps = 10**(-3),max_iter=100, draw_convergence=False):
+        max_iteration=100
         N = X.shape[0]
         d = X.shape[1]
         T = Y.shape[1]
@@ -110,99 +118,55 @@ class LearnCrowd2:
         #EM Algorithm
 
         #Initialization
-
-        alpha=np.ones((1,T))
-        alphaNew=0.5*np.ones((1,T))
-        beta=np.ones((1,T))
-        betaNew=0.5*np.ones((1,T))
         #initialisation des mu avec le majority voting
-        mu_inter=(np.sum(Y,axis=1)/T)
-
+        mu_inter=np.mean(Y,axis=1)
         mu = mu_inter.reshape((N,1))
-        w = np.ones((d,1))
+        #Initialisation alĂŠatoire du premier w
+        w=0.1 * np.random.rand(d)
+        #w=100* np.random.rand(d)
+        #w=np.ones((d,1))
+        #w[11]=10
+        w=w.reshape((d,1))
+        print("premier w")
+        print(w)
 
         # nombre_iteration = 0
-        cpt_iter=1
-        # self.liste_em=[]
-        # self.norme_gradient=[]
-        # valeur_EM_before=1
-        # valeur_EM=1000
+        nombre_iteration_EM=0
         liste_valeur_EM=[]
-        while (np.linalg.norm(alpha-alphaNew)**2 + np.linalg.norm(beta-betaNew)**2 >= eps and (cpt_iter<max_iter)):
-        #while(abs((valeur_EM-valeur_EM_before)/valeur_EM_before)>=eps and (cpt_iter<=1000)):
-
-            print("ITERATION NÂ°",cpt_iter)
-            print(" ... \n")
-
-            alpha = alphaNew
-            beta= betaNew
-
-
-            valeur_EM = self.likelihood(X,Y,alphaNew,betaNew,w,mu)
-            liste_valeur_EM.append(valeur_EM)
-            print("valeur EM")
-            print(valeur_EM)
-            # Expectation (E-step)
-            if(cpt_iter!=0):
-                    # self.liste_em.append(valeur_EM)
-                    #on change les valeurs des mu
-                    pi = sigmoide(np.dot(X,w)) + 1.0**(-10)
-                    #
-                    # for i in range(N):
-                    #     ai = calcule_ai(alphaNew,Y[i,:])
-                    #     bi = calcule_bi(betaNew,Y[i,:])
-                    #     pi = p_i[i,0]
-                    #     mu[i,0] = ai*pi/(ai*pi+bi*(1-pi))
-                    ai = calcule_ai(alphaNew, Y)
-                    bi = calcule_bi(betaNew, Y)
-
-                    mu = np.multiply(ai, pi) / (ai * pi + bi * (1-pi))
-
-
-            cpt_iter+=1
-            # Maximization (M-step)
-
-
-            #Optimisation de w
-             # "Zippage" de self.w
-            #autre optimisation
-            w_inter=w.reshape((d,1))
-            grad_w=gradient_modele_w(X,mu,w_inter,0)
-            nombre_iteration=0
-            while(np.linalg.norm(grad_w)>1.0**(-4) and nombre_iteration<1000):
-                Hess=hessien_modele(X,w_inter,0)
-                if(abs(np.linalg.det(Hess))<1.0**(-5)):
-                    Hess=np.eye(d,d)
-                direction=-gradient_modele_amine(X,mu,w_inter,1)
-                direction=direction.reshape((d,1))
-                w_inter=w_inter-0.005*np.dot(np.linalg.inv(Hess),direction)
-                grad_w=direction
-                nombre_iteration+=1
-
-            def BFGSfunc(vect):
-                return -self.likelihood(X, Y, alphaNew, betaNew,vect,mu)
-
-            def BFGSJac(vect):
-                d=np.shape(vect)[0]
-                return -gradient_modele_amine(X, mu, vect, l=0)
-
-            Teta_init = w
-            Teta_init=np.ndarray.flatten(w)
-
-            w=w_inter
-
-
-            print("W TROUVE !")
-            print(w)
-
-            #calcul de alpha
-            alpha_inter = np.dot(Y.T, mu) / ((np.sum(mu)) + 1.0**(-10))
+        valeur_EM_avant=-1000000
+        valeur_EM=0
+        while(nombre_iteration_EM<max_iteration and (valeur_EM-valeur_EM_avant)):
+            #Etape  Maximization
+            #calcul des alpha
+            alpha_inter = np.dot(Y.T, mu) / ((np.sum(mu))+1.0**(-15) )
             alphaNew=alpha_inter.reshape((1,T))
+
             #calcul de beta
             mu_inter = 1-mu
             y_inter = np.ones((N,T))-Y
-            beta_inter = np.dot(y_inter.T,mu_inter) / ((np.sum(mu_inter))+1.0**(-10))
+            beta_inter = np.dot(y_inter.T,mu_inter) / ((np.sum(mu_inter))+1.0**(-15))
             betaNew = beta_inter.reshape((1,T))
+
+            #optimisation de w
+            w=descente_gradient(w,X,mu,gradient_modele,hessien_modele)
+
+
+            #Etape Expectation, mise a jour des mu
+            pi = sigmoide(np.dot(X,w))
+            pi=pi.reshape((-1,1))
+            ai = calcule_ai(alphaNew, Y)
+            bi = calcule_bi(betaNew, Y)
+            numerateur=np.multiply(ai,pi)
+            denominateur=np.multiply(ai,pi)+np.multiply(bi,1-pi)
+            mu = np.multiply(numerateur,1/denominateur)
+            nombre_iteration_EM+=1
+
+            #valeur de l'EM a cette ĂŠtape
+            valeur_EM_avant=valeur_EM
+            valeur_EM=self.likelihood(X, Y, alphaNew, betaNew, w, mu)
+            liste_valeur_EM.append(valeur_EM)
+            #print("valeur de L EM")
+            #print(valeur_EM)
 
 
         self.alpha = alphaNew
@@ -210,21 +174,35 @@ class LearnCrowd2:
         self.w = w
         print("valeur de w")
         print(w)
-        #
-        plt.plot([i for i in range(len(liste_valeur_EM))],liste_valeur_EM)
-        plt.show()
-        plt.legend("variation de l'Em avec les itĂŠrations")
+        if draw_convergence:
+            #affichage de la courbe des variations de l'EM et des estimations des annotateurs
+            plt.plot([i for i in range(len(liste_valeur_EM))],liste_valeur_EM,linewidth=2.0, linestyle="-", label=('courbe de la variation de la log-vraisemblance lors de l EM'))
+            plt.xlabel("nombre d'iteration de l'EM")
+            plt.ylabel("Valeur de la log-vraisemblance")
+            plt.title("Evolution de la log-vraisemblance dans l'EM")
+            plt.show()
+            #plt.legend(bbox_to_anchor=(1, 0), bbox_transform=plt.gcf().transFigure)
+        print("valeur alpha (sensitivites des annotateurs)")
+        print(alphaNew)
+        print("valeur beta (spĂŠcificites des annotateurs)")
+        print(betaNew)
 
-    def predict(self, X, seuil):
-        #on prĂŠdit les vrais labels Ă  partir des donnĂŠes X
-        proba_class_1 = sigmoide(np.dot(X,self.w))
+
+
+    def predict(self, X,seuil):
+        proba_class_1=sigmoide(X.dot(self.w))
         labels_predicted = proba_class_1 > seuil
-        #labels_predicted = 2*labels_predicted-1
-        return labels_predicted.ravel()
+        bool2float = lambda x:float(x)
+        bool2float=np.vectorize(bool2float)
+        #print("predicts",proba_class_1)
+        return bool2float(labels_predicted).ravel()
 
-    def score(self, X, Z, seuil):
-        # On connaĂŽt la vĂŠritĂŠ terrain
-        return np.mean(self.predict(X, seuil)==Z)
+
+
+
+    def score(self, X, Z,seuil):
+         #On connaĂŽt la vĂŠritĂŠ terrain
+        return np.mean(self.predict(X,seuil)==Z)
 
 
     def debug(self):

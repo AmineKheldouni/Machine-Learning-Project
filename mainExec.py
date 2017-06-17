@@ -18,17 +18,27 @@ from resultFunctions import *
 
 # learn_cas_unif_x(create_class_and_learn)
 #learn_cas_unif_x(create_class_and_learn2)
-# learn_cas_depend_x(N_MC=10)
-# traceTrueData(LearnCrowd)
 
 # Courbe (a) sharelatex :
 #
-# drawScoreQuality(0.5,N_MC=5)
+# drawScoreQuality(0.5,N_MC=1)
 # drawScoreAnnotateurs(0.5,N_MC=5)
 # drawScorePropExperts(0.5,2,N_MC=5)
 
 # specialisedAnnotators()
-compareNoneSpecialised()
+
+
+#exp1
+compareNoneSpecialized()
+
+#exp2
+# learn_cas_depend_x(N_MC=1)
+
+#exp3
+# traceTrueData()
+
+#exp4
+# learn_cas_depend_Order()
 
 """
 Résumé des constantes à prendre :
@@ -47,4 +57,10 @@ Belles courbes :
 -> noise = 0.6
 -> N = 100
 -> T = 5
+
+et pour l'experience :
+tu prends trois groupes d'annotateurs
+l'un avec un nu_t=0
+l'un avec un nu_t=1, C_t=1
+l'un avec un nu_t=1, C_t=0
 """
