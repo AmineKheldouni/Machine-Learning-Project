@@ -40,14 +40,14 @@ def create_class_and_learn(xtrain,ytrain,ztrain,classifier=LearnCrowd,draw_conve
 #RETOURNE LE GROS VECTEUR DES SCORES A 6 TERMES (3 CLASSIFIEURS, TRAIN OU TEST) :
 #[s_train_LearnCrowd,s_train_Majority,s_train_RegLog,s_test_LearnCrowd,s_test_Majority,s_test_RegLog]
 
-def giveTrueData():
+def giveTrueData(slicing=0.8):
     X,Z = load_XZ('true_data/dataXZ_Adult.txt')
 
     Y = load_Y('true_data/dataY_Adult.txt')
 
     XX,YY, ZZ = genereWithoutMissing(X, Y, Z)
 
-    sliceTrain = int(XX.shape[0]*0.8)
+    sliceTrain = int(XX.shape[0]*slicing)
     xtrain, ytrain,ztrain = XX[0:sliceTrain,:], YY[0:sliceTrain,:], ZZ[0:sliceTrain]
     xtest, ytest,ztest = XX[sliceTrain+1:,:], YY[sliceTrain+1:,:], ZZ[sliceTrain+1:]
     xtrain = np.delete(xtrain,2,axis=1)
@@ -312,7 +312,7 @@ def trace_ROC_Unspecialized(S,M,C,S_unsup,xtrain,ytrain,ztrain,xtest,ytest,ztest
         FP_test_crowd_unsup.append(fp)
 
     plt.scatter(FP_train_labelleurs,TP_train_labelleurs)
-    plt.scatter(FP_train_crowd,TP_train_crowd,color="blue",label="ROC trainset CrowdLearning (Specialized)")
+    plt.scatter(FP_train_crowd,TP_train_crowd,color="blue",label="ROC trainset CrowdLearning (Specialized)",marker="o")
     plt.plot(FP_train_crowd_unsup,TP_train_crowd_unsup,color="green",label="ROC trainset CrowdLearning (Unspecialized)",marker="^")
     plt.plot(FP_train_majority,TP_train_majority,color="red",label="ROC trainset MajorityVoting")
     plt.plot(FP_train_class,TP_train_class,color="yellow",label="ROC trainset  ClassifierTruth")
@@ -320,7 +320,7 @@ def trace_ROC_Unspecialized(S,M,C,S_unsup,xtrain,ytrain,ztrain,xtest,ytest,ztest
     plt.show()
 
     plt.scatter(FP_test_labelleurs,TP_test_labelleurs)
-    plt.scatter(FP_test_crowd,TP_test_crowd,color="blue",label="ROC testset CrowdLearning (Specialized)")
+    plt.scatter(FP_test_crowd,TP_test_crowd,color="blue",label="ROC testset CrowdLearning (Specialized)",marker="o")
     plt.plot(FP_test_crowd_unsup,TP_test_crowd_unsup,color="green",label="ROC trainset CrowdLearning (Unspecialized)",marker="^")
     plt.plot(FP_test_majority,TP_test_majority,color="red",label="ROC testset MajorityVoting")
     plt.plot(FP_test_class,TP_test_class,color="yellow",label="ROC testset ClassifierTruth")
@@ -374,12 +374,12 @@ def specialisedAnnotators(f=create_class_and_learn):
 
 def compareNoneSpecialized(f=create_class_and_learn):
     N = 100 #nb données
-    T = 2 #nb annotateurs
+    T = 4 #nb annotateurs
     d = 2 #nb dimension des données : pas modifiable (gen_arti ne génère que des données de dimension 2)
-    noise_truth= 0. #bruit sur l'attribution des vrais labels gaussiens sur les données 2D (on pourrait aussi jouer sur ecart-type gaussienne avec sigma)
+    noise_truth= 0.2 #bruit sur l'attribution des vrais labels gaussiens sur les données 2D (on pourrait aussi jouer sur ecart-type gaussienne avec sigma)
     modele= "Bernoulli"
 
-    qualite_annotateurs_Bernoulli = [(0.6,0.9),(0.9,0.6)]
+    qualite_annotateurs_Bernoulli = [(0.6,0.9),(0.9,0.6)]*int(T/2)
     # qualite_annotateurs_Bernoulli=[[0.6,0.6],[0.6,0.6],[0.6,0.6],[0.7,0.7],[0.9,0.9]]
     Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli_xdepend,noise_truth,data_type=3,affiche=False)
 
@@ -757,21 +757,27 @@ def regularisation(classifier):
 ############################################
 ############################################
 
-def nb_donnees(classifier):
-    global N
-
-    Nb=np.array([XX.shape[0]*0.5,XX.shape[0]*0.6,XX.shape[0]*0.7,XX.shape[0]*0.8])
-    S = classifier(T,N,d)
+def nb_donnees():
     M=MajorityVoting()
     error_crowd_train=[]
     error_crowd_test=[]
     error_majority_train=[]
     error_majority_test=[]
+    Nb = np.array([0.5+i*0.05 for i in range(0,9)])
+    X,Z = load_XZ('true_data/dataXZ_Adult.txt')
 
-    for sliceTrain in Nb.astype(int):
+    Y = load_Y('true_data/dataY_Adult.txt')
 
-        xtrain, ytrain,ztrain = XX[0:sliceTrain,:], YY[0:sliceTrain,:], ZZ[0:sliceTrain]
-        xtest, ytest,ztest = XX[sliceTrain+1:,:], YY[sliceTrain+1:,:], ZZ[sliceTrain+1:]
+    XX,YY, ZZ = genereWithoutMissing(X, Y, Z)
+    perm=np.random.permutation(range(XX.shape[0]))
+    #permutation des stations (pour éviter que les stations considérées soient toutes à proximité)
+
+    for sliceTrain in Nb:
+        data_train=perm[:int(sliceTrain*XX.shape[0])] #stations que l'on utilise pour les prédictions
+        data_test=perm[int(sliceTrain*XX.shape[0])+1:] #stations dont on cherche à prédire l'offre et sur lesquelles on va calculer la vraisemblance
+
+        xtrain, ytrain,ztrain = XX[data_train], YY[data_train], ZZ[data_train]
+        xtest, ytest,ztest = XX[data_test], YY[data_test], ZZ[data_test]
         xtrain = np.delete(xtrain,2,axis=1)
         xtest = np.delete(xtest,2,axis=1)
 
@@ -782,8 +788,8 @@ def nb_donnees(classifier):
         ytrain = ytrain.astype(int)
         ytest = ytest.astype(int)
 
-        S = LearnCrowd2(ytrain.shape[1], xtrain.shape[0], xtrain.shape[1])
-        S.fit(xtrain,ytrain,max_iter=20)
+        S = LearnCrowd(ytrain.shape[1], xtrain.shape[0], xtrain.shape[1])
+        S.fit(xtrain,ytrain,max_iter=200)
 
         error_crowd_train.append(S.score(xtrain,ztrain,0.5))
         error_crowd_test.append(S.score(xtest,ztest,0.5))
@@ -795,8 +801,8 @@ def nb_donnees(classifier):
     plt.plot(Nb,error_majority_train,color="yellow")
     plt.plot(Nb,error_majority_test,color="green")
     plt.xlabel("Nombre de données d'apprentissage")
-    plt.ylabel("Erreurs")
-    plt.title("Erreurs sur les ensembles d'apprentissage (bleu,jaune) et de test (rouge,vert)  \n formant une partition (CrowdLearning,MajorityVoting)")
+    plt.ylabel("Scores")
+    plt.title("Scores sur les ensembles d'apprentissage (bleu,jaune) et de test (rouge,vert)  \n formant une partition (CrowdLearning,MajorityVoting)")
     plt.show()
 
 def traceTrueData(classifier1=LearnCrowd, classifier2=LearnCrowd2):
