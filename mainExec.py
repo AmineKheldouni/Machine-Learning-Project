@@ -29,13 +29,14 @@ from resultFunctions import *
 
 
 #exp1
-compareNoneSpecialized()
+# compareNoneSpecialized()
 
 #exp2
 # learn_cas_depend_x(N_MC=1)
 
 #exp3
-# traceTrueData()
+traceTrueData()
+# nb_donnees()
 
 #exp4
 # learn_cas_depend_Order()
