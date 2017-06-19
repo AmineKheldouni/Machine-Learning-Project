@@ -37,6 +37,7 @@ from resultFunctions import *
 #exp3
 traceTrueData()
 # nb_donnees()
+# regularisation(LearnCrowd)
 
 #exp4
 # learn_cas_depend_Order()

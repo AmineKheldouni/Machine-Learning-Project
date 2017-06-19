@@ -13,13 +13,16 @@ def optimize(fonc,dfonc,xinit,eps,max_iter):
     grad_histo.append(dfonc(x_histo[0]))
     while (it<max_iter):
         it+=1
-        x_new=x_histo[it-1]-eps*dfonc(x_histo[it-1])
+        x_new=x_histo[it-1]-eps/np.sqrt(1+it) * dfonc(x_histo[it-1])
         x_histo.append(x_new)
         f_histo.append(fonc(x_new))
         grad_histo.append(dfonc(x_new))
     x_histo=np.array(x_histo)
     f_histo=np.array(f_histo)
     grad_histo=np.array(grad_histo)
+    plt.plot(np.linspace(0,it,it+1),f_histo)
+    plt.show()
+    plt.title("RegLog cost optimization")
     return (x_histo,f_histo,grad_histo)
 
 def signe(x):

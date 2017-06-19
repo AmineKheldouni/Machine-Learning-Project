@@ -46,10 +46,14 @@ def giveTrueData(slicing=0.8):
     Y = load_Y('true_data/dataY_Adult.txt')
 
     XX,YY, ZZ = genereWithoutMissing(X, Y, Z)
+    perm=np.random.permutation(range(XX.shape[0]))
 
-    sliceTrain = int(XX.shape[0]*slicing)
-    xtrain, ytrain,ztrain = XX[0:sliceTrain,:], YY[0:sliceTrain,:], ZZ[0:sliceTrain]
-    xtest, ytest,ztest = XX[sliceTrain+1:,:], YY[sliceTrain+1:,:], ZZ[sliceTrain+1:]
+    data_train=perm[:int(slicing*XX.shape[0])] #stations que l'on utilise pour les prédictions
+    data_test=perm[int(slicing*XX.shape[0])+1:] #stations dont on cherche à prédire l'offre et sur lesquelles on va calculer la vraisemblance
+    sl = int(XX.shape[0]*slicing)
+
+    xtrain, ytrain,ztrain = XX[0:sl,:], YY[0:sl,:], ZZ[0:sl]
+    xtest, ytest,ztest = XX[sl+1:,:], YY[sl+1:,:], ZZ[sl+1:]
     xtrain = np.delete(xtrain,2,axis=1)
     xtest = np.delete(xtest,2,axis=1)
 
@@ -217,14 +221,14 @@ def trace_ROC(S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest):
         FP_test_class.append(fp)
 
     plt.scatter(FP_train_labelleurs,TP_train_labelleurs)
-    plt.scatter(FP_train_crowd,TP_train_crowd,color="blue",label="ROC trainset CrowdLearning (Specialized)")
+    plt.plot(FP_train_crowd,TP_train_crowd,color="blue",label="ROC trainset CrowdLearning (Specialized)",marker="o")
     plt.plot(FP_train_majority,TP_train_majority,color="red",label="ROC trainset MajorityVoting")
     plt.plot(FP_train_class,TP_train_class,color="yellow",label="ROC trainset  ClassifierTruth")
     plt.legend(bbox_to_anchor=(1, 1.14), loc=1, borderaxespad=0.)
     plt.show()
 
     plt.scatter(FP_test_labelleurs,TP_test_labelleurs)
-    plt.scatter(FP_test_crowd,TP_test_crowd,color="blue",label="ROC testset CrowdLearning (Specialized)")
+    plt.plot(FP_test_crowd,TP_test_crowd,color="blue",label="ROC testset CrowdLearning (Specialized)",marker="o")
     plt.plot(FP_test_majority,TP_test_majority,color="red",label="ROC testset MajorityVoting")
     plt.plot(FP_test_class,TP_test_class,color="yellow",label="ROC testset ClassifierTruth")
     plt.legend(bbox_to_anchor=(1, 1.14), loc=1, borderaxespad=0.)
@@ -255,8 +259,8 @@ def trace_ROC_Unspecialized(S,M,C,S_unsup,xtrain,ytrain,ztrain,xtest,ytest,ztest
         TP_test_labelleurs.append(tp)
         FP_test_labelleurs.append(fp)
 
-    seuils=[0.001*k for k in range(1001)]
-    seuils.append(np.inf)
+    seuils=[0.0001*k for k in range(10001)]
+
     TP_train_crowd=[]
     FP_train_crowd=[]
     TP_test_crowd=[]
@@ -312,7 +316,7 @@ def trace_ROC_Unspecialized(S,M,C,S_unsup,xtrain,ytrain,ztrain,xtest,ytest,ztest
         FP_test_crowd_unsup.append(fp)
 
     plt.scatter(FP_train_labelleurs,TP_train_labelleurs)
-    plt.scatter(FP_train_crowd,TP_train_crowd,color="blue",label="ROC trainset CrowdLearning (Specialized)",marker="o")
+    plt.plot(FP_train_crowd,TP_train_crowd,color="blue",label="ROC trainset CrowdLearning (Specialized)",marker="o")
     plt.plot(FP_train_crowd_unsup,TP_train_crowd_unsup,color="green",label="ROC trainset CrowdLearning (Unspecialized)",marker="^")
     plt.plot(FP_train_majority,TP_train_majority,color="red",label="ROC trainset MajorityVoting")
     plt.plot(FP_train_class,TP_train_class,color="yellow",label="ROC trainset  ClassifierTruth")
@@ -320,7 +324,7 @@ def trace_ROC_Unspecialized(S,M,C,S_unsup,xtrain,ytrain,ztrain,xtest,ytest,ztest
     plt.show()
 
     plt.scatter(FP_test_labelleurs,TP_test_labelleurs)
-    plt.scatter(FP_test_crowd,TP_test_crowd,color="blue",label="ROC testset CrowdLearning (Specialized)",marker="o")
+    plt.plot(FP_test_crowd,TP_test_crowd,color="blue",label="ROC testset CrowdLearning (Specialized)",marker="o")
     plt.plot(FP_test_crowd_unsup,TP_test_crowd_unsup,color="green",label="ROC trainset CrowdLearning (Unspecialized)",marker="^")
     plt.plot(FP_test_majority,TP_test_majority,color="red",label="ROC testset MajorityVoting")
     plt.plot(FP_test_class,TP_test_class,color="yellow",label="ROC testset ClassifierTruth")
@@ -346,7 +350,7 @@ def learn_cas_unif_x(f=create_class_and_learn):
     xtest=Vect[3]
     ytest=Vect[4]
     ztest=Vect[5]
-    S,M,C = f(xtrain,ytrain,ztrain,draw_convergence=False)
+    S,M,C = f(xtrain,ytrain,ztrain,draw_convergence=True)
 
     predicts(2,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,0.5,affiche=True)
     trace_ROC(S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest)
@@ -728,28 +732,32 @@ def learn_cas_depend_Order(f=create_class_and_learn):
 ####################################
 
 def regularisation(classifier):
-    lbd=[pow(10,-k) for k in range(-5,5)]
+    lbd=[pow(10,-k) for k in range(-7,7)]
+    xtrain,ytrain,ztrain,xtest,ytest,ztest = giveTrueData()
+    T = ytrain.shape[1]
+    N = xtrain.shape[0]
+    d = xtrain.shape[1]
     error_train=[]
     error_test=[]
     M = MajorityVoting()
-    strain_majority=M.score(ytrain,ztrain,0.5)
-    stest_majority= M.score(ytest,ztest,0.5)
+    # strain_majority=M.score(ytrain,ztrain,0.5)
+    # stest_majority= M.score(ytest,ztest,0.5)
     for l in lbd:
         S = classifier(T,N,d,l)
-        S.fit(xtrain,ytrain,max_iter=20)
+        S.fit(xtrain,ytrain,max_iter=100)
         results = []
         results.append(S.score(xtrain,ztrain,0.5))
-        results.append(M.score(xtrain,ztrain,0.5))
+        # results.append(M.score(xtrain,ztrain,0.5))
         results.append(S.score(xtest,ztest,0.5))
         results.append(S.score(xtest,ztest,0.5))
         error_train.append(results[0])
         error_test.append(results[2])
 
-    plt.plot(list(range(-5,5)),error_train,color="blue")
-    plt.plot(list(range(-5,5)),error_test,color="red")
+    plt.plot(list(range(-7,7)),error_train,color="blue")
+    # pailt.plot(list(range(-7,7)),error_test,color="red")
     plt.xlabel("Paramètre de régularisation")
-    plt.ylabel("Erreurs")
-    plt.title("Erreurs d'entrainement (bleu) et de test (rouge) \n en fonction du paramètre de régularisation")
+    plt.ylabel("Scores")
+    plt.title("Scores d'entrainement (bleu) et de test (rouge) \n en fonction du paramètre de régularisation")
     plt.show()
 
 
@@ -810,14 +818,14 @@ def traceTrueData(classifier1=LearnCrowd, classifier2=LearnCrowd2):
     T = ytrain.shape[1]
     N = xtrain.shape[0]
     d = xtrain.shape[1]
-    S = classifier1(T,N,d)
+    S = classifier1(T,N,d,0.01)
     M = MajorityVoting()
     C = Classifier_RegLog()
     S_now = classifier2(T,N,d)
 
-    S.fit(xtrain, ytrain, max_iter=200,draw_convergence=True)
-    C.fit(xtrain,ztrain,0.005,1000,affiche=False)
+    S.fit(xtrain, ytrain, max_iter=60,draw_convergence=True)
+    C.fit(xtrain,ztrain,0.01,1000,affiche=False)
     S_now.fit(xtrain, ytrain,draw_convergence=True)
-    #
+
     # predicts(2,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,0.5,affiche=False)
     trace_ROC_Unspecialized(S,M,C,S_now,xtrain,ytrain,ztrain,xtest,ytest,ztest)

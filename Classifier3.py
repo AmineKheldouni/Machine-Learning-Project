@@ -79,8 +79,8 @@ class LearnCrowdOrder:
         mat_z_cond_x = self.z_cond_x(X, alpha, beta)
 
         esp = np.zeros((N,T))
-        esp += np.multiply(Pt[:,1].reshape((-1,1)),np.log(y_cond_z[:,:,1]+pow(10,-10))+np.log(mat_z_cond_x[:,1]+pow(10,-10)).reshape((-1,1)))
-        esp += np.multiply(Pt[:,0].reshape((-1,1)),np.log(y_cond_z[:,:,0]+pow(10,-10))+np.log(mat_z_cond_x[:,0]+pow(10,-10)).reshape((-1,1)))
+        esp += np.multiply(Pt[:,1].reshape((-1,1)),np.log(abs(y_cond_z[:,:,1])+pow(10,-10))+np.log(abs(mat_z_cond_x[:,1])+pow(10,-10)).reshape((-1,1)))
+        esp += np.multiply(Pt[:,0].reshape((-1,1)),np.log(abs(y_cond_z[:,:,0])+pow(10,-10))+np.log(abs(mat_z_cond_x[:,0])+pow(10,-10)).reshape((-1,1)))
 
         return np.sum(esp) - self.lb * np.linalg.norm(w)**2
 
@@ -137,7 +137,7 @@ class LearnCrowdOrder:
 
         return (grad_lh_alpha, grad_lh_beta, grad_lh_gamma, grad_lh_w, grad_lh_nu, grad_lh_S)
 
-    def fit(self, X, Y, epsGrad=10**(-2), model="Bernoulli", eps = 10**(-8), max_iter=200, draw_convergence=False):
+    def fit(self, X, Y, epsGrad=10**(-2), model="Bernoulli", eps = 10**(-8), max_iter=100, draw_convergence=False):
         N = X.shape[0]
         d = X.shape[1]
         T = Y.shape[1]
@@ -149,8 +149,10 @@ class LearnCrowdOrder:
         betaNew = np.random.rand()
         wNew = np.random.rand(d,T)
         gammaNew = np.random.rand(1,T)
-        nuNew = np.random.rand(1,T)*0.5
-        sNew = np.random.rand(1,T)*0.5
+        # nuNew = np.random.rand(1,T)
+        # sNew = np.random.rand(1,T)
+        nuNew = np.random.rand(1,T)
+        sNew = np.random.rand(1,T)
 
         self.alpha = np.zeros((1,d))
         self.beta = 0
@@ -164,11 +166,12 @@ class LearnCrowdOrder:
         LH = []
         #if model=="Bernoulli":
         Pt = self.expects_labels_Bernoulli(X, Y, self.alpha, self.beta, self.gamma, self.w, self.nu, self.S)
-
+        LH2 = self.likelihood(Pt, X, Y, model, self.alpha, self.beta, self.gamma, self.w, self.nu, self.S)
+        LH1 = LH2-1
         # while ( np.linalg.norm(self.alpha - alphaNew)**2 + np.linalg.norm(self.beta - betaNew)**2 > eps and cpt_iter < max_iter):
         while (cpt_iter < max_iter):
 
-
+            LH1 = LH2
             print("ITERATION N°",cpt_iter)
 
             self.alpha = alphaNew
@@ -193,9 +196,9 @@ class LearnCrowdOrder:
             normGrad = np.linalg.norm(Galpha)+np.linalg.norm(Gbeta)+np.linalg.norm(Ggamma)+np.linalg.norm(Gw)+np.linalg.norm(Gnu)+np.linalg.norm(Gs)
             grad_desc_count = 0
             # print("MAXIMIZATION : ")
-            while (normGrad > epsGrad and grad_desc_count < 200):
-                # print("counter :", grad_desc_count)
-                # print("Norme Grad : ", normGrad)
+            while (normGrad > epsGrad and grad_desc_count < 250):
+                print("counter :", grad_desc_count)
+                print("Norme Grad : ", normGrad)
                 step = 0.005/((grad_desc_count+1))**2
                 alphaNew += step * Galpha
                 betaNew += step * Gbeta
@@ -210,18 +213,32 @@ class LearnCrowdOrder:
 
             cpt_iter+=1
 
-            LH.append(self.likelihood(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew, nuNew, sNew))
-
+            LH2=self.likelihood(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew, nuNew, sNew)
+            LH.append(LH2)
         self.alpha = alphaNew
         self.beta = betaNew
         self.gamma = gammaNew
         self.w = wNew
         self.nu = nuNew
         self.S = sNew
+
+        print("ALPHA : ")
+        print(self.alpha)
+
+        print("BETA : ")
+        print(self.beta)
+
+        print("GAMMA : ")
+        print(self.gamma)
+
+        print("W : ")
+        print(self.w)
+
         print("NU : ")
         print(self.nu)
         print("S : ")
         print(self.S)
+
         #print("############ Test BFGS #######################")
         if draw_convergence:
             plt.plot(np.linspace(1,cpt_iter,cpt_iter),LH)

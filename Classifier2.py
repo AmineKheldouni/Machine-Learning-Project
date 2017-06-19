@@ -59,7 +59,7 @@ def descente_gradient(w_init,X,mu,gradient_fonction,hessienne_fonction):
     nombre_iteration=1
     while(np.linalg.norm(w1-w0)>1.0**(-4) and nombre_iteration<100):
         w0=w1
-        coeff=0.1/np.sqrt(nombre_iteration)
+        coeff=0.5/np.sqrt(nombre_iteration)
         vecteur_gradient=gradient_fonction(X,mu,w1)
         Hessienne=hessienne_fonction(X,w1)
         #if(np.linalg.det(Hessienne)==0):

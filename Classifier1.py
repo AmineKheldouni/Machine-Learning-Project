@@ -190,6 +190,115 @@ class LearnCrowd:
         # Grad = np.concatenate((grad_lh_alpha.ravel(),np.array([grad_lh_beta]).ravel(),grad_lh_gamma.ravel(),grad_lh_w.ravel()),axis=0)
         #
         # return Grad.ravel()
+    def fitBFGS(self, X, Y, epsGrad=10**(-3), model="Bernoulli", eps = 10**(-3), max_iter=40, draw_convergence=False):
+        N = X.shape[0]
+        d = X.shape[1]
+        T = Y.shape[1]
+
+        #EM Algorithm
+
+        #Initialization
+
+        # ArtificialData Initialization
+
+        alphaNew = np.random.rand(1,d)
+        betaNew = np.random.rand()
+        wNew = np.random.rand(d,T)
+        gammaNew = np.random.rand(1,T)
+
+        self.alpha = np.zeros((1,d))
+        self.beta = 0
+
+        # TrueData Initialization
+        # alphaNew = np.random.rand(1,d)*10
+        # betaNew = np.random.rand()*10
+        # wNew = np.random.rand(d,T)*50
+        # gammaNew = np.random.rand(1,T)*50
+
+        cpt_iter=0
+        LH = []
+        #if model=="Bernoulli":
+        Pt = self.expects_labels_Bernoulli(X, Y, self.alpha, self.beta, self.gamma, self.w)
+        normGrad = np.linalg.norm(self.grad_likelihood(Pt, X, Y, model, self.alpha, self.beta, self.gamma, self.w))
+        diffLH = 1
+        # while ( np.linalg.norm(self.alpha - alphaNew)**2 + np.linalg.norm(self.beta - betaNew)**2 > eps and cpt_iter < max_iter):
+        while (cpt_iter < max_iter and diffLH):
+
+
+            print("ITERATION N°",cpt_iter)
+
+            self.alpha = alphaNew
+            self.beta = betaNew
+            self.gamma = gammaNew
+            self.w = wNew
+
+
+            # Expectation (E-step)
+
+            Pt = self.expects_labels_Bernoulli(X, Y, self.alpha, self.beta, self.gamma, self.w)
+
+            # Maximization (M-step)
+            #
+            # Galpha, Gbeta, Ggamma, Gw = self.grad_likelihood_V2(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew)
+            # normGrad = np.linalg.norm(Galpha)+np.linalg.norm(Gbeta)+np.linalg.norm(Ggamma)+np.linalg.norm(Gw)
+            grad_desc_count = 0
+            # print("MAXIMIZATION : ")
+
+            BFGSfunc = lambda vect : -self.likelihood(Pt, X, Y, model, vect[0:d].reshape((1,d)), float(vect[d:d+1]), vect[d+1:d+1+T].reshape((1,T)), vect[d+1+T:d+1+T+d*T].reshape((d,T)))
+
+            BFGSJac = lambda vect : -self.grad_likelihood_V2(Pt, X, Y, model, vect[0:d].reshape((1,d)), float(vect[d:d+1]), vect[d+1:d+1+T].reshape((1,T)), vect[d+1+T:d+1+T+d*T].reshape((d,T)))
+
+            Teta_init = np.concatenate((alphaNew.ravel(),np.array([betaNew]).ravel(),gammaNew.ravel(),wNew.ravel()),axis=0) #initial guess
+
+            #rappels des tailles de alpha, beta, gamma, w : (1,d), 1, (1,T), (d,T)
+            LH.append(-BFGSfunc(Teta_init))
+            result = minimize(BFGSfunc, Teta_init, method='BFGS', jac = BFGSJac,\
+                              options={'gtol': 1e-5, 'disp': True, 'maxiter': 1000})
+            print(result.message)
+            # print("Optimal solution :")
+            # print(result.x)
+
+            # "Dézippage" de Teta solution en self.alpha, self.beta, self.gamma, self.w
+            # To Update new vectors :
+
+            Teta = result.x
+            print("SUCCESS : ")
+            print(result.success)
+
+            print("NORME DU GRADIENT : ")
+            normGrad = np.linalg.norm(BFGSJac(Teta))
+            print(normGrad)
+
+            alphaNew = Teta[0:d].reshape((1,d))
+            betaNew = float(Teta[d:d+1])
+            gammaNew = Teta[d+1:d+1+T].reshape((1,T))
+            wNew = Teta[d+1+T:d+1+T+d*T].reshape((d,T))
+
+            cpt_iter+=1
+
+            # LH.append(self.likelihood(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew))
+            # if (len(LH) >= 2):
+            #     diffLH = LH[-1]-LH[-2]
+
+        print("alpha : ")
+        print(self.alpha)
+        print("beta : ")
+        print(self.beta)
+        print("gamma : ")
+        print(self.gamma)
+        print("w : ")
+        print(self.w)
+        self.alpha = alphaNew
+        self.beta = betaNew
+        self.gamma = gammaNew
+        self.w = wNew
+
+        if draw_convergence:
+            plt.plot(np.linspace(1,cpt_iter,cpt_iter),LH)
+            plt.title("Convergence de l'EM")
+            plt.xlabel("nombre d'itérations")
+            plt.ylabel("log-vraisemblance")
+            plt.show()
 
     def fit(self, X, Y, epsGrad=10**(-3), model="Bernoulli", eps = 10**(-3), max_iter=200, draw_convergence=False):
         N = X.shape[0]
@@ -202,19 +311,19 @@ class LearnCrowd:
 
         # ArtificialData Initialization
 
-        # alphaNew = np.random.rand(1,d)
-        # betaNew = np.random.rand()
-        # wNew = np.random.rand(d,T)
-        # gammaNew = np.random.rand(1,T)
+        alphaNew = np.random.rand(1,d)
+        betaNew = np.random.rand()
+        wNew = np.random.rand(d,T)
+        gammaNew = np.random.rand(1,T)
 
         self.alpha = np.zeros((1,d))
         self.beta = 0
 
         # TrueData Initialization
-        alphaNew = np.random.rand(1,d)*10
-        betaNew = np.random.rand()*10
-        wNew = np.random.rand(d,T)*50
-        gammaNew = np.random.rand(1,T)*50
+        # alphaNew = np.random.rand(1,d)*10
+        # betaNew = np.random.rand()*10
+        # wNew = np.random.rand(d,T)*50
+        # gammaNew = np.random.rand(1,T)*50
 
         cpt_iter=0
         LH = []
@@ -244,11 +353,11 @@ class LearnCrowd:
             normGrad = np.linalg.norm(Galpha)+np.linalg.norm(Gbeta)+np.linalg.norm(Ggamma)+np.linalg.norm(Gw)
             grad_desc_count = 0
             # print("MAXIMIZATION : ")
-            while (normGrad > epsGrad and grad_desc_count < 100):
+            while (normGrad > epsGrad and grad_desc_count < 200):
                 # print("counter :", grad_desc_count)
                 # print("Norme Grad : ", normGrad)
                 # step = 0.1/np.sqrt(1+grad_desc_count)
-                step = 0.001/(1+grad_desc_count)**2
+                step = 0.0001/(1+grad_desc_count)**2
                 alphaNew += step * Galpha
                 betaNew += step * Gbeta
                 gammaNew += step * Ggamma
@@ -263,6 +372,14 @@ class LearnCrowd:
             if (len(LH) >= 2):
                 diffLH = LH[-1]-LH[-2]
 
+        print("alpha : ")
+        print(self.alpha)
+        print("beta : ")
+        print(self.beta)
+        print("gamma : ")
+        print(self.gamma)
+        print("w : ")
+        print(self.w)
         self.alpha = alphaNew
         self.beta = betaNew
         self.gamma = gammaNew
