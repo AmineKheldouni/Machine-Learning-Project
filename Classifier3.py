@@ -30,35 +30,22 @@ class LearnCrowdOrder:
         return z_cond_x
 
     def y_cond_z(self, X, Y, gamma, w, nu, S):
-
         (N,d)=np.shape(X)
         (N,T)=np.shape(Y)
-
-        eta = 1/(1+np.exp(-np.dot(X,w)-gamma)) # Taille : N,T
-
+        eta = 1/(1+np.exp(-np.dot(X,w)-gamma))
         y_cond_z = np.zeros((N,T,2))
         Z = np.tile(np.zeros(N).reshape(-1,1),(1,T))
         tmpPower = np.abs(Y-Z)
         y_cond_z[:,:,0] = np.multiply((1-nu),((1-eta)**tmpPower)*(eta**(1-tmpPower)))+np.multiply(nu, S**Y * (1-S)**(1-Y))
-
         Z = np.tile(np.ones(N).reshape(-1,1),(1,T))
         tmpPower = np.abs(Y-Z)
         y_cond_z[:,:,1] = np.multiply((1-nu),((1-eta)**tmpPower)*(eta**(1-tmpPower)))+np.multiply(nu, S**Y * (1-S)**(1-Y))
-
         return y_cond_z
 
     def expects_labels_Bernoulli(self, X, Y, alpha, beta, gamma, w, nu, S):
-        """calcule les probas des labels z pour chaque donnée -> taille (N,2)
-        en multipliant sur tous les labelleurs : la proba que le vrai label soit 0 ou 1 et que le label du labelleur Yt soit celui obtenu sachant la donnée i
-        donnée dans le modèle de Bernoulli par la matrice y_z_cond_x = y_cond_z_cond_x * z_cond_x = y_cond_z * z_cond_x"""
-
         (N,d)=np.shape(X)
         (N,T)=np.shape(Y)
-
-        eta = 1/(1+np.exp(-np.dot(X,w)-gamma)) # Taille : N,T
-
-        #proba cond du label Yt du labelleur t pour la donnée i sachant le vrai label 0 ou 1 (Bernoulli)
-
+        eta = 1/(1+np.exp(-np.dot(X,w)-gamma))
         y_cond_z = self.y_cond_z(X, Y, gamma, w, nu, S)
         mat_z_cond_x = self.z_cond_x(X, alpha, beta)
         results = np.multiply(np.prod(y_cond_z,axis=1),mat_z_cond_x)
@@ -70,11 +57,7 @@ class LearnCrowdOrder:
 
         (N,d)=np.shape(X)
         (N,T)=np.shape(Y)
-
-        eta = 1/(1+np.exp(-np.dot(X,w)-gamma)) # Taille : N,T
-
-        #proba cond du label Yt du labelleur t pour la donnée i sachant le vrai label 0 ou 1 (Bernoulli)
-
+        eta = 1/(1+np.exp(-np.dot(X,w)-gamma))
         y_cond_z = self.y_cond_z(X, Y, gamma, w, nu, S)
         mat_z_cond_x = self.z_cond_x(X, alpha, beta)
 
@@ -105,13 +88,6 @@ class LearnCrowdOrder:
         for z in range(2):
             tmp[:,:,z]=np.abs(Y-z)
 
-        # mat2 = np.zeros((N,T))
-        # mat2 = np.multiply(np.multiply(Pt[:,1].reshape((-1,1)),np.multiply(tmp_exp_2,1-tmp[:,:,1])-tmp[:,:,1])+np.multiply(Pt[:,0].reshape((-1,1)),np.multiply(tmp_exp_2,1-tmp[:,:,0])-tmp[:,:,0]),etasigma)
-        # grad_lh_gamma = np.sum(mat2,axis=0)
-        #
-        # mat3 = np.zeros((N,d,T))
-        # mat3 = np.multiply(np.repeat(mat2[:,np.newaxis,:],d,axis=1),np.repeat(X[:,:,np.newaxis],T,axis=2))
-        # grad_lh_w = np.sum(mat3,axis=0) - self.lb * w #Taille d,T
         grad_etasigma_w = np.zeros((N,T,d))
         for t in range(T):
             grad_etasigma_w[:,t,:] = (etasigma[:,t]*(1-etasigma)[:,t]).reshape((N,1)) * X # Taille : N,T,d
@@ -149,11 +125,8 @@ class LearnCrowdOrder:
         betaNew = np.random.rand()
         wNew = np.random.rand(d,T)
         gammaNew = np.random.rand(1,T)
-        # nuNew = np.random.rand(1,T)
-        # sNew = np.random.rand(1,T)
         nuNew = np.random.rand(1,T)
         sNew = np.random.rand(1,T)
-
         self.alpha = np.zeros((1,d))
         self.beta = 0
 
@@ -168,7 +141,7 @@ class LearnCrowdOrder:
         Pt = self.expects_labels_Bernoulli(X, Y, self.alpha, self.beta, self.gamma, self.w, self.nu, self.S)
         LH2 = self.likelihood(Pt, X, Y, model, self.alpha, self.beta, self.gamma, self.w, self.nu, self.S)
         LH1 = LH2-1
-        # while ( np.linalg.norm(self.alpha - alphaNew)**2 + np.linalg.norm(self.beta - betaNew)**2 > eps and cpt_iter < max_iter):
+
         while (cpt_iter < max_iter):
 
             LH1 = LH2
@@ -181,25 +154,16 @@ class LearnCrowdOrder:
             self.nu = nuNew
             self.S = sNew
 
-
             # Expectation (E-step)
-
-            #if model=="Bernoulli":
             Pt = self.expects_labels_Bernoulli(X, Y, self.alpha, self.beta, self.gamma, self.w, self.nu, self.S)
-            #elif model=="Gaussian":
-            #Pt = self.expects_labels_Gaussian(X, Y, self.alpha, self.beta, self.gamma, self.w)
 
-            #print(Pt)
             # Maximization (M-step)
-
             Galpha, Gbeta, Ggamma, Gw, Gnu, Gs = self.grad_likelihood(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew, nuNew, sNew)
             normGrad = np.linalg.norm(Galpha)+np.linalg.norm(Gbeta)+np.linalg.norm(Ggamma)+np.linalg.norm(Gw)+np.linalg.norm(Gnu)+np.linalg.norm(Gs)
             grad_desc_count = 0
-            # print("MAXIMIZATION : ")
+
             while (normGrad > epsGrad and grad_desc_count < 250):
-                print("counter :", grad_desc_count)
-                print("Norme Grad : ", normGrad)
-                step = 0.005/((grad_desc_count+1))**2
+                step = 0.001/((grad_desc_count+1))**2
                 alphaNew += step * Galpha
                 betaNew += step * Gbeta
                 gammaNew += step * Ggamma
@@ -222,24 +186,6 @@ class LearnCrowdOrder:
         self.nu = nuNew
         self.S = sNew
 
-        print("ALPHA : ")
-        print(self.alpha)
-
-        print("BETA : ")
-        print(self.beta)
-
-        print("GAMMA : ")
-        print(self.gamma)
-
-        print("W : ")
-        print(self.w)
-
-        print("NU : ")
-        print(self.nu)
-        print("S : ")
-        print(self.S)
-
-        #print("############ Test BFGS #######################")
         if draw_convergence:
             plt.plot(np.linspace(1,cpt_iter,cpt_iter),LH)
             plt.title("Convergence de l'EM")
@@ -248,8 +194,6 @@ class LearnCrowdOrder:
             plt.show()
 
     def predict(self, X, seuil):
-        #on prédit les vrais labels à partir des données X
-
         tmp_exp = np.exp(-np.dot(X,self.alpha.T)-self.beta) # Taille : N
         proba_class_1 = 1/(1+tmp_exp)
         labels_predicted = proba_class_1 > seuil
@@ -258,5 +202,4 @@ class LearnCrowdOrder:
         return bool2float(labels_predicted).ravel()
 
     def score(self, X, Z, seuil):
-        # On connaît la vérité terrain
         return np.mean(self.predict(X,seuil)==Z)

@@ -16,7 +16,7 @@ from resultFunctions import *
 
 #LearnfromtheCrowd2(N,T,d,modele,qualite_annoteur,generation_Bernouilli,noise_truth)
 
-# learn_cas_unif_x(create_class_and_learn)
+learn_cas_unif_x(create_class_and_learn)
 #learn_cas_unif_x(create_class_and_learn2)
 
 # Courbe (a) sharelatex :
@@ -35,7 +35,7 @@ from resultFunctions import *
 # learn_cas_depend_x(N_MC=1)
 
 #exp3
-traceTrueData()
+# traceTrueData()
 # nb_donnees()
 # regularisation(LearnCrowd)
 

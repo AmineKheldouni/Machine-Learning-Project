@@ -16,7 +16,7 @@ class LearnCrowd:
         self.lb = l
 
     def z_cond_x(self, X, alpha, beta):
-        """renvoie la matrice z_cond_x : proba que le vrai label soit 0 ou 1 sachant la donnée (Rlog) (indépendant du modèle Bernoulli/Gaussien"""
+        """renvoie la matrice z_cond_x : proba que le vrai label soit 0 ou 1 sachant la donnée (Rlog) (indépendant du modèle Bernoulli/Gaussien)"""
         z_cond_x = np.zeros((X.shape[0],2))
         sigm = lambda x:  1/(1+np.exp(x))
         sigm=np.vectorize(sigm)
@@ -27,7 +27,7 @@ class LearnCrowd:
         return z_cond_x
 
     def y_cond_z(self, X, Y, gamma, w):
-
+        """Renvoie la matrice y_cond_z,x ; proba d'attribution d'une annotation connaissant les données"""
         (N,d)=np.shape(X)
         (N,T)=np.shape(Y)
 
@@ -51,22 +51,10 @@ class LearnCrowd:
 
         (N,d)=np.shape(X)
         (N,T)=np.shape(Y)
-
         eta = 1/(1+np.exp(-np.dot(X,w)-gamma)) # Taille : N,T
-
-        #proba cond du label Yt du labelleur t pour la donnée i sachant le vrai label 0 ou 1 (Bernoulli)
-
         y_cond_z = self.y_cond_z(X, Y, gamma, w)
         mat_z_cond_x = self.z_cond_x(X, alpha, beta)
         results = np.multiply(np.prod(y_cond_z,axis=1),mat_z_cond_x)
-        # s = results[:,0] + results[:,1]
-        # results[:,0] = results[:,0]
-        # results[:,1] = results[:,1]
-        # # traite = lambda x:traite_zero(x)
-        # # traite = np.vectorize(traite)
-        # # sum = traite(sum)
-        # # results[:,0] = np.multiply(results[:,0],1/sum)
-        # # results[:,1] = np.multiply(results[:,1],1/sum)
         return results
 
     def likelihood(self, Pt, X, Y, model, alpha, beta, gamma, w):
@@ -75,55 +63,15 @@ class LearnCrowd:
 
         (N,d)=np.shape(X)
         (N,T)=np.shape(Y)
-
         eta = 1/(1+np.exp(-np.dot(X,w)-gamma)) # Taille : N,T
-
-        #proba cond du label Yt du labelleur t pour la donnée i sachant le vrai label 0 ou 1 (Bernoulli)
-
         y_cond_z = self.y_cond_z(X, Y, gamma, w)
         mat_z_cond_x = self.z_cond_x(X, alpha, beta)
-
         esp = np.zeros((N,T))
         esp += np.multiply(Pt[:,1].reshape((-1,1)),np.log(y_cond_z[:,:,1]+pow(10,-10))+np.log(mat_z_cond_x[:,1]+pow(10,-10)).reshape((-1,1)))
         esp += np.multiply(Pt[:,0].reshape((-1,1)),np.log(y_cond_z[:,:,0]+pow(10,-10))+np.log(mat_z_cond_x[:,0]+pow(10,-10)).reshape((-1,1)))
-
         return np.sum(esp) - self.lb * np.linalg.norm(w)**2
 
-    def grad_likelihood(self, Pt, X, Y, model, alpha, beta, gamma, w):
-        """Returns the partial derivatives of likelihood according to
-        alpha, beta, gamma and w
-        model=Bernoulli ou Gaussian"""
-
-        (N,d)=np.shape(X)
-        (N,T)=np.shape(Y)
-
-        deltaPt = Pt[:,1]-Pt[:,0]
-        deltaPt = deltaPt.reshape((N,1))
-        tmp_exp = np.exp(-np.dot(X,alpha.T)-beta)
-
-        grad_lh_alpha = np.sum(np.multiply(deltaPt*tmp_exp/((1+tmp_exp)**2),X) ,axis=0).reshape((1,d)) #Taille 1,d
-        grad_lh_beta = np.sum(deltaPt*(tmp_exp,1/((1+tmp_exp)**2)))  #Taille 1
-        tmp_exp_2 = np.exp(-np.dot(X,w)-gamma) # Taille : N,T
-        etasigma = 1/(1+tmp_exp_2)
-
-        grad_etasigma_gamma = etasigma*(1-etasigma) # Taille : N,T
-
-        grad_etasigma_w = np.zeros((N,d,T))
-        for t in range(0,T):
-            grad_etasigma_w[:,:,t]= np.multiply((etasigma[:,t]*(1-etasigma[:,t])).reshape(N,1),X) #taille N,d,T
-
-        grad_lh_etasigma = (-deltaPt)*((-1)**Y) # Taille : N,T
-
-        grad_lh_gamma = np.sum(np.multiply(grad_lh_etasigma,grad_etasigma_gamma),axis=0).reshape((1,T)) #Taille 1,T
-        grad_lh_w = np.sum(np.multiply(np.repeat(grad_lh_etasigma[:,np.newaxis,:],d,axis=1),grad_etasigma_w),axis=0).reshape((d,T)) #Taille d,T
-
-
-        # "Zippage" des gradients en un grand vecteur
-        Grad = np.concatenate((grad_lh_alpha.ravel(),np.array([grad_lh_beta]).ravel(),grad_lh_gamma.ravel(),grad_lh_w.ravel()),axis=0)
-
-        return Grad.ravel()
-
-    def grad_likelihood_2(self, Pt, X, Y, model, alpha, beta, gamma, w):
+    def grad_likelihood(self, Pt, X, Y, model, alpha, beta, gamma, w, BFGS=False):
         """Returns the partial derivatives of likelihood according to
         alpha, beta, gamma and w
         model=Bernoulli ou Gaussian"""
@@ -151,46 +99,13 @@ class LearnCrowd:
         mat3 = np.zeros((N,d,T))
         mat3 = np.multiply(np.repeat(mat2[:,np.newaxis,:],d,axis=1),np.repeat(X[:,:,np.newaxis],T,axis=2))
         grad_lh_w = np.sum(mat3,axis=0) - self.lb * w #Taille d,T
-
-        # "Zippage" des gradients en un grand vecteur
-        Grad = np.concatenate((grad_lh_alpha.ravel(),np.array([grad_lh_beta]).ravel(),grad_lh_gamma.ravel(),grad_lh_w.ravel()),axis=0)
-
-        return Grad.ravel()
-
-    def grad_likelihood_V2(self, Pt, X, Y, model, alpha, beta, gamma, w):
-        """Returns the partial derivatives of likelihood according to
-        alpha, beta, gamma and w
-        model=Bernoulli ou Gaussian"""
-
-        (N,d)=np.shape(X)
-        (N,T)=np.shape(Y)
-
-        tmp_exp = np.exp(-np.dot(X,alpha.T)-beta)
-
-        mat = np.multiply(np.multiply(Pt[:,1].reshape((-1,1)),tmp_exp) - Pt[:,0].reshape((-1,1)),1/(1+tmp_exp))
-        grad_lh_alpha = T*np.sum(mat.reshape((-1,1))*X,axis=0) #Taille 1,d
-        grad_lh_beta = T*np.sum(mat.reshape((-1,1)),axis=0)  #Taille 1
-
-        tmp_exp_2 = np.exp(-np.dot(X,w)-gamma) # Taille : N,T
-        etasigma = 1/(1+tmp_exp_2)
-
-        tmp = np.zeros((N,T,2))
-        for z in range(2):
-            tmp[:,:,z]=np.abs(Y-z)
-
-        mat2 = np.zeros((N,T))
-        mat2 = np.multiply(np.multiply(Pt[:,1].reshape((-1,1)),np.multiply(tmp_exp_2,1-tmp[:,:,1])-tmp[:,:,1])+np.multiply(Pt[:,0].reshape((-1,1)),np.multiply(tmp_exp_2,1-tmp[:,:,0])-tmp[:,:,0]),etasigma)
-        grad_lh_gamma = np.sum(mat2,axis=0)
-
-        mat3 = np.zeros((N,d,T))
-        mat3 = np.multiply(np.repeat(mat2[:,np.newaxis,:],d,axis=1),np.repeat(X[:,:,np.newaxis],T,axis=2))
-        grad_lh_w = np.sum(mat3,axis=0) - self.lb * w #Taille d,T
-
+        if (BFGS):
+            Grad = np.concatenate((grad_lh_alpha.ravel(),np.array([grad_lh_beta]).ravel(),grad_lh_gamma.ravel(),grad_lh_w.ravel()),axis=0)
+            return Grad.ravel()
         return (grad_lh_alpha, grad_lh_beta, grad_lh_gamma, grad_lh_w)
-        # Grad = np.concatenate((grad_lh_alpha.ravel(),np.array([grad_lh_beta]).ravel(),grad_lh_gamma.ravel(),grad_lh_w.ravel()),axis=0)
-        #
-        # return Grad.ravel()
-    def fitBFGS(self, X, Y, epsGrad=10**(-3), model="Bernoulli", eps = 10**(-3), max_iter=40, draw_convergence=False):
+
+
+    def fit(self, X, Y, epsGrad=10**(-3), model="Bernoulli", eps = 10**(-3), max_iter=500, draw_convergence=False):
         N = X.shape[0]
         d = X.shape[1]
         T = Y.shape[1]
@@ -200,7 +115,6 @@ class LearnCrowd:
         #Initialization
 
         # ArtificialData Initialization
-
         alphaNew = np.random.rand(1,d)
         betaNew = np.random.rand()
         wNew = np.random.rand(d,T)
@@ -217,11 +131,11 @@ class LearnCrowd:
 
         cpt_iter=0
         LH = []
-        #if model=="Bernoulli":
+
         Pt = self.expects_labels_Bernoulli(X, Y, self.alpha, self.beta, self.gamma, self.w)
         normGrad = np.linalg.norm(self.grad_likelihood(Pt, X, Y, model, self.alpha, self.beta, self.gamma, self.w))
         diffLH = 1
-        # while ( np.linalg.norm(self.alpha - alphaNew)**2 + np.linalg.norm(self.beta - betaNew)**2 > eps and cpt_iter < max_iter):
+
         while (cpt_iter < max_iter and diffLH):
 
 
@@ -234,40 +148,100 @@ class LearnCrowd:
 
 
             # Expectation (E-step)
-
             Pt = self.expects_labels_Bernoulli(X, Y, self.alpha, self.beta, self.gamma, self.w)
 
             # Maximization (M-step)
-            #
-            # Galpha, Gbeta, Ggamma, Gw = self.grad_likelihood_V2(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew)
-            # normGrad = np.linalg.norm(Galpha)+np.linalg.norm(Gbeta)+np.linalg.norm(Ggamma)+np.linalg.norm(Gw)
+            Galpha, Gbeta, Ggamma, Gw = self.grad_likelihood(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew)
+            normGrad = np.linalg.norm(Galpha)+np.linalg.norm(Gbeta)+np.linalg.norm(Ggamma)+np.linalg.norm(Gw)
             grad_desc_count = 0
-            # print("MAXIMIZATION : ")
+
+            while (normGrad > epsGrad and grad_desc_count < 400):
+                step = 0.0001/(1+grad_desc_count)**2
+                alphaNew += step * Galpha
+                betaNew += step * Gbeta
+                gammaNew += step * Ggamma
+                wNew += step * Gw
+                Galpha, Gbeta, Ggamma, Gw = self.grad_likelihood(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew)
+                normGrad = np.linalg.norm(Galpha)+np.linalg.norm(Gbeta)+np.linalg.norm(Ggamma)+np.linalg.norm(Gw)
+                grad_desc_count += 1
+            cpt_iter+=1
+
+            LH.append(self.likelihood(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew))
+            if (len(LH) >= 2):
+                diffLH = LH[-1]-LH[-2]
+
+        self.alpha = alphaNew
+        self.beta = betaNew
+        self.gamma = gammaNew
+        self.w = wNew
+
+        if draw_convergence:
+            plt.plot(np.linspace(1,cpt_iter,cpt_iter),LH)
+            plt.title("Convergence de l'EM")
+            plt.xlabel("nombre d'itérations")
+            plt.ylabel("log-vraisemblance")
+            plt.show()
+
+
+    def predict(self, X, seuil):
+        #on prédit les vrais labels à partir des données X
+        tmp_exp = np.exp(-np.dot(X,self.alpha.T)-self.beta) # Taille : N
+        proba_class_1 = 1/(1+tmp_exp)
+        labels_predicted = proba_class_1 > seuil
+        bool2float = lambda x:float(x)
+        bool2float=np.vectorize(bool2float)
+        return bool2float(labels_predicted).ravel()
+
+    def score(self, X, Z, seuil):
+        # On connaît la vérité terrain
+        return np.mean(self.predict(X,seuil)==Z)
+
+    def fitBFGS(self, X, Y, epsGrad=10**(-3), model="Bernoulli", eps = 10**(-3), max_iter=40, draw_convergence=False):
+        N = X.shape[0]
+        d = X.shape[1]
+        T = Y.shape[1]
+
+        ### EM Algorithm ###
+
+        #Initialization
+        alphaNew = np.random.rand(1,d)
+        betaNew = np.random.rand()
+        wNew = np.random.rand(d,T)
+        gammaNew = np.random.rand(1,T)
+        self.alpha = np.zeros((1,d))
+        self.beta = 0
+        cpt_iter=0
+        LH = []
+
+        Pt = self.expects_labels_Bernoulli(X, Y, self.alpha, self.beta, self.gamma, self.w)
+        normGrad = np.linalg.norm(self.grad_likelihood(Pt, X, Y, model, self.alpha, self.beta, self.gamma, self.w))
+        diffLH = 1
+
+        while (cpt_iter < max_iter and diffLH):
+
+            self.alpha = alphaNew
+            self.beta = betaNew
+            self.gamma = gammaNew
+            self.w = wNew
+
+            # Expectation (E-step)
+            Pt = self.expects_labels_Bernoulli(X, Y, self.alpha, self.beta, self.gamma, self.w)
+
+            # Maximization (M-step)
+            grad_desc_count = 0
 
             BFGSfunc = lambda vect : -self.likelihood(Pt, X, Y, model, vect[0:d].reshape((1,d)), float(vect[d:d+1]), vect[d+1:d+1+T].reshape((1,T)), vect[d+1+T:d+1+T+d*T].reshape((d,T)))
-
-            BFGSJac = lambda vect : -self.grad_likelihood_V2(Pt, X, Y, model, vect[0:d].reshape((1,d)), float(vect[d:d+1]), vect[d+1:d+1+T].reshape((1,T)), vect[d+1+T:d+1+T+d*T].reshape((d,T)))
+            BFGSJac = lambda vect : -self.grad_likelihood(Pt, X, Y, model, vect[0:d].reshape((1,d)), float(vect[d:d+1]), vect[d+1:d+1+T].reshape((1,T)), vect[d+1+T:d+1+T+d*T].reshape((d,T)),BFGS=True)
 
             Teta_init = np.concatenate((alphaNew.ravel(),np.array([betaNew]).ravel(),gammaNew.ravel(),wNew.ravel()),axis=0) #initial guess
 
-            #rappels des tailles de alpha, beta, gamma, w : (1,d), 1, (1,T), (d,T)
             LH.append(-BFGSfunc(Teta_init))
             result = minimize(BFGSfunc, Teta_init, method='BFGS', jac = BFGSJac,\
                               options={'gtol': 1e-5, 'disp': True, 'maxiter': 1000})
             print(result.message)
-            # print("Optimal solution :")
-            # print(result.x)
-
-            # "Dézippage" de Teta solution en self.alpha, self.beta, self.gamma, self.w
-            # To Update new vectors :
 
             Teta = result.x
-            print("SUCCESS : ")
-            print(result.success)
-
-            print("NORME DU GRADIENT : ")
             normGrad = np.linalg.norm(BFGSJac(Teta))
-            print(normGrad)
 
             alphaNew = Teta[0:d].reshape((1,d))
             betaNew = float(Teta[d:d+1])
@@ -276,18 +250,6 @@ class LearnCrowd:
 
             cpt_iter+=1
 
-            # LH.append(self.likelihood(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew))
-            # if (len(LH) >= 2):
-            #     diffLH = LH[-1]-LH[-2]
-
-        print("alpha : ")
-        print(self.alpha)
-        print("beta : ")
-        print(self.beta)
-        print("gamma : ")
-        print(self.gamma)
-        print("w : ")
-        print(self.w)
         self.alpha = alphaNew
         self.beta = betaNew
         self.gamma = gammaNew
@@ -299,238 +261,3 @@ class LearnCrowd:
             plt.xlabel("nombre d'itérations")
             plt.ylabel("log-vraisemblance")
             plt.show()
-
-    def fit(self, X, Y, epsGrad=10**(-3), model="Bernoulli", eps = 10**(-3), max_iter=200, draw_convergence=False):
-        N = X.shape[0]
-        d = X.shape[1]
-        T = Y.shape[1]
-
-        #EM Algorithm
-
-        #Initialization
-
-        # ArtificialData Initialization
-
-        alphaNew = np.random.rand(1,d)
-        betaNew = np.random.rand()
-        wNew = np.random.rand(d,T)
-        gammaNew = np.random.rand(1,T)
-
-        self.alpha = np.zeros((1,d))
-        self.beta = 0
-
-        # TrueData Initialization
-        # alphaNew = np.random.rand(1,d)*10
-        # betaNew = np.random.rand()*10
-        # wNew = np.random.rand(d,T)*50
-        # gammaNew = np.random.rand(1,T)*50
-
-        cpt_iter=0
-        LH = []
-        #if model=="Bernoulli":
-        Pt = self.expects_labels_Bernoulli(X, Y, self.alpha, self.beta, self.gamma, self.w)
-        normGrad = np.linalg.norm(self.grad_likelihood(Pt, X, Y, model, self.alpha, self.beta, self.gamma, self.w))
-        diffLH = 1
-        # while ( np.linalg.norm(self.alpha - alphaNew)**2 + np.linalg.norm(self.beta - betaNew)**2 > eps and cpt_iter < max_iter):
-        while (cpt_iter < max_iter and diffLH):
-
-
-            print("ITERATION N°",cpt_iter)
-
-            self.alpha = alphaNew
-            self.beta = betaNew
-            self.gamma = gammaNew
-            self.w = wNew
-
-
-            # Expectation (E-step)
-
-            Pt = self.expects_labels_Bernoulli(X, Y, self.alpha, self.beta, self.gamma, self.w)
-
-            # Maximization (M-step)
-
-            Galpha, Gbeta, Ggamma, Gw = self.grad_likelihood_V2(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew)
-            normGrad = np.linalg.norm(Galpha)+np.linalg.norm(Gbeta)+np.linalg.norm(Ggamma)+np.linalg.norm(Gw)
-            grad_desc_count = 0
-            # print("MAXIMIZATION : ")
-            while (normGrad > epsGrad and grad_desc_count < 200):
-                # print("counter :", grad_desc_count)
-                # print("Norme Grad : ", normGrad)
-                # step = 0.1/np.sqrt(1+grad_desc_count)
-                step = 0.0001/(1+grad_desc_count)**2
-                alphaNew += step * Galpha
-                betaNew += step * Gbeta
-                gammaNew += step * Ggamma
-                wNew += step * Gw
-                Galpha, Gbeta, Ggamma, Gw = self.grad_likelihood_V2(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew)
-                normGrad = np.linalg.norm(Galpha)+np.linalg.norm(Gbeta)+np.linalg.norm(Ggamma)+np.linalg.norm(Gw)
-                grad_desc_count += 1
-
-            cpt_iter+=1
-
-            LH.append(self.likelihood(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew))
-            if (len(LH) >= 2):
-                diffLH = LH[-1]-LH[-2]
-
-        print("alpha : ")
-        print(self.alpha)
-        print("beta : ")
-        print(self.beta)
-        print("gamma : ")
-        print(self.gamma)
-        print("w : ")
-        print(self.w)
-        self.alpha = alphaNew
-        self.beta = betaNew
-        self.gamma = gammaNew
-        self.w = wNew
-
-        if draw_convergence:
-            plt.plot(np.linspace(1,cpt_iter,cpt_iter),LH)
-            plt.title("Convergence de l'EM")
-            plt.xlabel("nombre d'itérations")
-            plt.ylabel("log-vraisemblance")
-            plt.show()
-
-
-    def fitNoW(self, X, Y, epsLH=10**(-5), model="Bernoulli", epsGrad = 10**(-2), max_iter=500, draw_convergence=False):
-        N = X.shape[0]
-        d = X.shape[1]
-        T = Y.shape[1]
-
-        #Initialization
-
-        self.alpha = np.zeros((1,d))
-        self.beta = 0
-        self.w = np.zeros((d,T))
-        alphaNew = np.random.rand(1,d)*7
-        betaNew = np.random.rand()*10
-        wNew = np.zeros((d,T))
-        gammaNew = np.random.rand(1,T)*10
-
-        cpt_iter=0
-        Pt = self.expects_labels_Bernoulli(X, Y, self.alpha, self.beta, self.gamma, np.zeros((d,T)))
-        LH = [self.likelihood(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew)]
-        normGrad = np.linalg.norm(self.grad_likelihood(Pt, X, Y, model, self.alpha, self.beta, self.gamma, self.w))
-        tmp_LH = 1
-        # while ( np.linalg.norm(self.alpha - alphaNew)**2 + np.linalg.norm(self.beta - betaNew)**2 > eps and cpt_iter < max_iter):
-        while ( abs(LH[cpt_iter]-tmp_LH) > epsLH and cpt_iter < max_iter):
-
-
-            print("ITERATION N°",cpt_iter)
-            print("Norme du gradient : ", normGrad)
-            self.alpha = alphaNew
-            self.beta = betaNew
-            self.gamma = gammaNew
-
-
-            # Expectation (E-step)
-
-            #if model=="Bernoulli":
-            Pt = self.expects_labels_Bernoulli(X, Y, self.alpha, self.beta, self.gamma, self.w)
-            #elif model=="Gaussian":
-            #Pt = self.expects_labels_Gaussian(X, Y, self.alpha, self.beta, self.gamma, self.w)
-
-            #print(Pt)
-            # Maximization (M-step)
-
-            Galpha, Gbeta, Ggamma, Gw = self.grad_likelihood_V2(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew)
-            normGrad = np.linalg.norm(Galpha)+np.linalg.norm(Gbeta)+np.linalg.norm(Ggamma)+np.linalg.norm(Gw)
-            grad_desc_count = 0
-            # print("MAXIMIZATION : ")
-            while (normGrad > epsGrad and grad_desc_count < 500):
-                # print("counter :", grad_desc_count)
-                # print("Norme Grad : ", normGrad)
-                step = 1/((grad_desc_count+1))**2
-                alphaNew += step * Galpha
-                betaNew += step * Gbeta
-                gammaNew += step * Ggamma
-                Galpha, Gbeta, Ggamma, Gw = self.grad_likelihood_V2(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew)
-                normGrad = np.linalg.norm(Galpha)+np.linalg.norm(Gbeta)+np.linalg.norm(Ggamma)+np.linalg.norm(Gw)
-                grad_desc_count += 1
-            cpt_iter+=1
-
-            LH.append(self.likelihood(Pt, X, Y, model, alphaNew, betaNew, gammaNew, wNew))
-
-        self.alpha = alphaNew
-        self.beta = betaNew
-        self.gamma = gammaNew
-        #print("############ Test BFGS #######################")
-        if draw_convergence:
-            plt.plot(np.linspace(0,cpt_iter,cpt_iter+1),LH)
-            plt.title("Convergence de l'EM")
-            plt.show()
-
-    def predict(self, X, seuil):
-        #on prédit les vrais labels à partir des données X
-
-        tmp_exp = np.exp(-np.dot(X,self.alpha.T)-self.beta) # Taille : N
-        proba_class_1 = 1/(1+tmp_exp)
-        labels_predicted = proba_class_1 > seuil
-        bool2float = lambda x:float(x)
-        bool2float=np.vectorize(bool2float)
-        return bool2float(labels_predicted).ravel()
-
-    def predictV3(self, X, Y, seuil, modeltrain):
-        (N,d)=np.shape(X)
-        predictions = np.zeros((N,1))
-
-        if modeltrain=="Bernoulli":
-           predictions += np.dot(X,self.alpha.T) + self.beta
-           #print(predictions)
-           for t in range(T):
-              #print(np.dot(X,self.gamma[0,t]))
-              predictions += np.multiply(np.reshape((-1)**(1-Y[:,t]),(-1,1)),np.reshape(np.dot(X,self.w[:,t]),(-1,1))) + self.gamma[0,t]
-           #print(predictions)
-
-        fun = lambda x:1-1/(1+np.exp(x))
-        fun = np.vectorize(fun)
-        probas_class_1 = fun(predictions)
-        #print("HAHAHA")
-        #print(probas_class_1)
-        probas_class_1 = probas_class_1 > seuil
-        #print(probas_class_1 > seuil)
-        probas_class_1 = probas_class_1.ravel()
-        convertfloat = lambda x:float(x)
-        convertfloat = np.vectorize(convertfloat)
-        #print(convertfloat(probas_class_1))
-        return convertfloat(probas_class_1)
-
-    def predictV2(self, Ytest, Xtrain, modeltrain):
-        #Xtrain sont les données qui ont été utilisées pendant l'apprentissage (pas besoin de Ytrain ???, seul les poids appris suffisent ??)
-        #modeltrain est le modèle utilisé pendant l'apprentissage
-        #on prédit les vrais labels à partir des annotations de Ytest
-
-        #On veut calculer non pas les probas des labels Z mais des labels Z sachant les annotations de Ytest pour chaque labelleur
-        #Ainsi on va appliquer les mêmes méthodes "expects_labels_" mais que sur les données de Xtrain qui ont été annotées par un type d'annotation donné
-
-        #Ou en fixant tous les Y à la Ytest comme suit ?
-
-        N=Xtrain.shape[0]
-        labels_predicted=np.zeros((N,1))
-
-        unit=np.ones((N,1))
-
-        for i in range(N):
-            if modeltrain=="Bernoulli":
-               #print(np.shape(Ytest[i,:].reshape((1,-1))))
-               #print(np.shape(Ytest[i,:].reshape((1,-1)).tile((N,1))))
-               Pt = self.expects_labels_Bernoulli(Xtrain, np.dot(unit,Ytest[i,:].reshape(1,-1)), self.alpha, self.beta, self.gamma, self.w)
-            if modeltrain=="Gaussian":
-               Pt = self.expects_labels_Gaussian(Xtrain, np.dot(unit,Ytest[i,:].reshape(1,-1)), self.alpha, self.beta, self.gamma, self.w)
-            probas_class=np.mean(Pt,axis=0)
-            labels_predicted[i,0] = probas_class[1] > probas_class[0]
-
-        return labels_predicted.ravel()
-
-    def score(self, X, Z, seuil):
-        # On connaît la vérité terrain
-        return np.mean(self.predict(X,seuil)==Z)
-
-    def scoreV2(self,Ytest,Ztest,Xtrain,modeltrain):
-        # On connaît la vérité terrain
-        return np.mean(self.predictV2(Ytest, Xtrain, modeltrain)==Ztest)
-
-    def scoreV3(self,X,Y,Z,seuil,modeltrain):
-        # On connaît la vérité terrain
-        return np.mean(self.predictV3(X,Y,seuil,modeltrain)==Z)

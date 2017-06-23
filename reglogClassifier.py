@@ -20,9 +20,6 @@ def optimize(fonc,dfonc,xinit,eps,max_iter):
     x_histo=np.array(x_histo)
     f_histo=np.array(f_histo)
     grad_histo=np.array(grad_histo)
-    plt.plot(np.linspace(0,it,it+1),f_histo)
-    plt.show()
-    plt.title("RegLog cost optimization")
     return (x_histo,f_histo,grad_histo)
 
 def signe(x):
