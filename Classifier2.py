@@ -17,16 +17,12 @@ def calcule_ai(alpha, Y):
     T = Y.shape[0]
     ai = np.prod(np.multiply(alpha**Y, (1-alpha)**(1-Y)), axis = 1).reshape((T,1))
     return ai
-    # for t in range(T):
-    #     res = res*(alpha[0,t]**(Y[t]))*((1-alpha[0,t])**(1-Y[t]))
-    # return res
+    
 
 def calcule_bi(beta, Y):
     T=Y.shape[0]
     return np.prod(np.multiply(beta**(1-Y), (1-beta)**(Y)), axis = 1).reshape((T,1))
-    # for t in range(T):
-    #     res=res*(beta[0,t]**(1-yi[t]))*((1-beta[0,t])**(yi[t]))
-    # return res
+   
 
 #calcul du gradient
 def gradient_modele(X, mu, w):
@@ -71,16 +67,16 @@ def descente_gradient(w_init,X,mu,gradient_fonction,hessienne_fonction):
 #classe du classifieur
 class LearnCrowd2:
     def __init__(self, T, N, d, l=0):
-        self.alpha = np.zeros((1,T)) # sensitivitÄĹ  des annoteur
-        self.beta = np.zeros((1,T)) #specificitÄĹ 
-        self.w = np.ones((d,1)) # Poids pour le modÄÂ¨le (indÄĹ pendant des annoteur)
+        self.alpha = np.zeros((1,T)) # sensitivite des annotateurs
+        self.beta = np.zeros((1,T)) #specificite des annotateurs�
+        self.w = np.ones((d,1)) # Poids pour le modele 
         self.y_trouve=np.zeros((N,1))
         #lambda de ridge regression
         self.lb = l
-        self.gamma="nothing"
+        
 
     def likelihood(self, X, Y, alpha, beta, w, vrai_y):
-        # vrai_y = mu_i
+        
 
         N = X.shape[0]
         T = Y.shape[1]
@@ -92,19 +88,14 @@ class LearnCrowd2:
         pi_ai=np.multiply(p_i,a_i)
         pi_bi=np.multiply((1-p_i),b_i)
 
-        #log_pi = np.log(p_i)
-        #log_un_pi = np.log(1+1.0**(-10)-p_i)
+       
         vrai_un_yi = (1-vrai_y)
 
-        #a1 = np.multiply(a_i, log_pi)
-        #a1 = np.multiply(a1, vrai_y)
+        
         v1=np.multiply(vrai_y,np.log(pi_ai+1.0**(-10)))
         v2=np.multiply(vrai_un_yi,np.log(pi_bi+1.0**(-10)))
 
-        #b1 = np.multiply(b_i, log_un_pi)
-        #b1 = np.multiply(b1, vrai_un_yi)
-
-        #log_res = np.sum(a1+b1)
+    
         log_res=np.sum(v1+v2)
 
         return log_res
@@ -121,16 +112,10 @@ class LearnCrowd2:
         #initialisation des mu avec le majority voting
         mu_inter=np.mean(Y,axis=1)
         mu = mu_inter.reshape((N,1))
-        #Initialisation alĂŠatoire du premier w
+        #Initialisation aleatoire du premier w
         w=0.1 * np.random.rand(d)
-        #w=100* np.random.rand(d)
-        #w=np.ones((d,1))
-        #w[11]=10
         w=w.reshape((d,1))
-        print("premier w")
-        print(w)
-
-        # nombre_iteration = 0
+        
         nombre_iteration_EM=0
         liste_valeur_EM=[]
         valeur_EM_avant=-1000000
@@ -161,19 +146,16 @@ class LearnCrowd2:
             mu = np.multiply(numerateur,1/denominateur)
             nombre_iteration_EM+=1
 
-            #valeur de l'EM a cette ĂŠtape
+            #valeur de l'EM a cette etape
             valeur_EM_avant=valeur_EM
             valeur_EM=self.likelihood(X, Y, alphaNew, betaNew, w, mu)
             liste_valeur_EM.append(valeur_EM)
-            #print("valeur de L EM")
-            #print(valeur_EM)
+            
 
-
+        #conservation des parametres appris pour le classifieur
         self.alpha = alphaNew
         self.beta = betaNew
         self.w = w
-        print("valeur de w")
-        print(w)
         if draw_convergence:
             #affichage de la courbe des variations de l'EM et des estimations des annotateurs
             plt.plot([i for i in range(len(liste_valeur_EM))],liste_valeur_EM,linewidth=2.0, linestyle="-", label=('courbe de la variation de la log-vraisemblance lors de l EM'))
@@ -184,7 +166,7 @@ class LearnCrowd2:
             #plt.legend(bbox_to_anchor=(1, 0), bbox_transform=plt.gcf().transFigure)
         print("valeur alpha (sensitivites des annotateurs)")
         print(alphaNew)
-        print("valeur beta (spĂŠcificites des annotateurs)")
+        print("valeur beta (specificites des annotateurs)")
         print(betaNew)
 
 
@@ -194,14 +176,13 @@ class LearnCrowd2:
         labels_predicted = proba_class_1 > seuil
         bool2float = lambda x:float(x)
         bool2float=np.vectorize(bool2float)
-        #print("predicts",proba_class_1)
         return bool2float(labels_predicted).ravel()
 
 
 
 
     def score(self, X, Z,seuil):
-         #On connaĂŽt la vĂŠritĂŠ terrain
+         #On compare a la verite terrain
         return np.mean(self.predict(X,seuil)==Z)
 
 
