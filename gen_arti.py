@@ -1,7 +1,9 @@
 from importModule import *
 
-#I. BLOC GENERATION DE X ET Z
-#UTILISER DATA_TYPE = 0 et DATA_TYPE =1
+#I. BLOC GENERATION DES FEATURES X ET DES VRAIS LABELS Z
+
+#gen_arti,plot_data,plot_frontiere,make_grid : fonctions reprises du TP3 de Machine Learning
+#gen_arti légèrement adaptée (data_type=1,data_type=3)
 
 def gen_arti(centerx=1,centery=1,sigma=0.1,nbex=1000,data_type=0,epsilon=0.02):
     """ Generateur de donnees,
@@ -85,14 +87,14 @@ def make_grid(data=None,xmin=-5,xmax=5,ymin=-5,ymax=5,step=20):
     grid=np.c_[x.ravel(),y.ravel()]
     return grid, x, y
 
+#II. BLOC GENERATION DES LABELS DES ANNOTATEURS Y
 
-#II. BLOC GENERATION DE Y
-
-#ADAPTE AU MODELE 1
 def modifie_label_Bernoulli(label,proba):
-    """proba = (proba d'avoir juste si label 0,proba d'avoir juste si label 1) :
-    modifie le vrai label 0 en choisissant l'autre avec une probabilité 1-proba[0]
-    modifie le vrai label 1 en choisissant l'autre avec une probabilité 1-proba[1]"""
+    """renvoie le label attribué par l'annotateur de Bernouilli suivant proba :
+    label est le vrai label Z (vérité terrain) correspondant à la donnée
+    proba = (probabilité que l'annotateur donne le vrai label si ce dernier est 0,
+    probabilité que l'annotateur donne le vrai label si ce dernier est 1)
+    c'est-à-dire proba = (spécificité, sensibilité) de l'annotateur de Bernouilli"""
     valeur_proba=np.random.uniform(0,1)
     label_res=label
     if((label==0)and(valeur_proba>=proba[0])):
@@ -101,11 +103,13 @@ def modifie_label_Bernoulli(label,proba):
         label_res=1-label
     return label_res
 
-
 def generation_Bernoulli(N,T,qualite_annotateur_Bernoulli,noise_truth,data_type=0):
-    """retourne en xtrain les données de dimension 2, en ytrain les annotations, en ztrain les vrais labels
-    avec pour qualite_annotateurs une liste contenant les probabilités de succès de chaque annotateur TP,TN
-    noise_truth est le bruit de l'attribution des vrais labels gaussiens sur les données"""
+    """retourne trois matrices :
+    xtrain les N données artificielles de dimension 2 de type data_type générées par gen_arti,
+    ytrain les labels donnés par les T annotateurs de Bernouilli pour chacune des N données
+    ztrain les vrais labels
+    où qualite_annotateurs est une liste contenant pour chaque annotateur de Bernouilli la paire (spécificité, sensibilité)
+    et où noise_truth est le bruit sur l'attribution des vrais labels"""
     xtrain,ztrain = gen_arti(nbex=N,data_type=data_type,epsilon=noise_truth) #vrai labels non bruités
     ztrain=(ztrain+1)/2
     ytrain=np.zeros((N,T)) #changement des labels
@@ -115,56 +119,46 @@ def generation_Bernoulli(N,T,qualite_annotateur_Bernoulli,noise_truth,data_type=
         ytrain[:,t]=annote(ztrain)
     return xtrain,ytrain,ztrain
 
-
-'''
-def modifie_label_gaussien(label,variance_annoteur):
-    """modifie le vrai label en choississant un autre label donnée par la gaussienne centré sur le vrai label
-    avec la variance de l'annoteur"""
-    valeur_label=gauss(label,variance_annoteur)
-    return valeur_label
-
-def generation_Gaussian(N,T,qualite_annotateur_gaussien,noise_truth):
-    """retourne en xtrain les données de dimension 2, en ytrain les annotations, en ztrain les vrais labels
-    avec pour qualite_annotateurs une liste contenant les variances de chaque annotateur
-    noise_truth est le bruit de l'attribution des vrais labels gaussiens sur les données"""
-    xtrain,ztrain = gen_arti(nbex=N,data_type=0,epsilon=noise_truth) #vrai labels non bruités
-    ytrain=np.zeros((N,T)) #changement des labels
-    for t in range(T):
-        annote=lambda x:modifie_label_gaussien(x,qualite_annotateur_gaussien[t])
-        annote=np.vectorize(annote)
-        ytrain[:,t]=annote(ztrain)
-    return xtrain,ytrain,ztrain
-'''
-
-#ADAPTE AU MODELE 2
-def modifie_label_Bernoulli_xdepend(data,label,proba):
-    """proba = (proba d'avoir juste si donnee dans zone 0,proba d'avoir juste si donnee dans zone 1)
-    modifie le vrai label en choisissant l'autre avec une probabilité 1-proba[0] (dans la zone 0)
-    et 1-proba[1] (dans la zone 1)
-    où zone 0 = donnes 2D de x positif, zone 1 = donnes 2D de x negatif"""
+def modifie_label_Bernoulli_xy_depend(data,label,proba):
+    """renvoie le label attribué par l'annotateur de Bernouilli spécialisé suivant proba :
+    data correspond aux features X de la donnée de dimension 2
+    label est le vrai label Z (vérité terrain) correspondant à cette donnée data
+    proba = (probabilité que l'annotateur donne le vrai label si la donnée est située dans la zone |y|>|x|,
+    probabilité que l'annotateur donne le vrai label si la donnée est située dans la zone |x|>|y|)"""
     valeur_proba=np.random.uniform(0,1)
     label_res=label
-    if data[0]>=0: #donnees à x négatif (groupe 1 de données)
+    if (abs(data[1])>abs(data[0])): #(groupe 1 de données)
         if(valeur_proba>=proba[0]):
            label_res=1-label
-    else: #données à x positif (groupe 2 de données)
+    else: #(groupe 2 de données)
         if(valeur_proba>=proba[1]):
            label_res=1-label
     return label_res
 
-def generation_Bernoulli_xdepend(N,T,qualite_annotateur_Bernoulli,noise_truth,data_type=0):
-    """retourne en xtrain les données de dimension 2, en ytrain les annotations, en ztrain les vrais labels
-    avec pour qualite_annotateur_Bernoulli les probabilités de succès de chaque annotateur dans chaque zone"""
+def generation_Bernoulli_xy_depend(N,T,qualite_annotateur_Bernoulli,noise_truth,data_type=0):
+    """retourne trois matrices :
+    xtrain les N données artificielles de dimension 2 de type data_type générées par gen_arti,
+    ytrain les labels donnés par les T annotateurs de Bernouilli pour chacune des N données
+    ztrain les vrais labels
+    où qualite_annotateurs est une liste contenant pour chaque annotateur de Bernouilli la paire proba
+    proba = (probabilité que l'annotateur donne le vrai label si la donnée est située dans la zone |y|>|x|,
+    probabilité que l'annotateur donne le vrai label si la donnée est située dans la zone |x|>|y|)
+    et où noise_truth est le bruit sur l'attribution des vrais labels"""
     xtrain,ztrain = gen_arti(nbex=N,data_type=data_type,epsilon=noise_truth) #vrai labels non bruités
     ztrain=(ztrain+1)/2
     ytrain=np.zeros((N,T)) #changement des labels
     for t in range(T):
-        annote=lambda idx_data,z:modifie_label_Bernoulli_xdepend(xtrain[idx_data,:],z,qualite_annotateur_Bernoulli[t])
+        annote=lambda idx_data,z:modifie_label_Bernoulli_xy_depend(xtrain[idx_data,:],z,qualite_annotateur_Bernoulli[t])
         annote=np.vectorize(annote)
         ytrain[:,t]=annote(list(range(np.shape(xtrain)[0])),ztrain)
     return xtrain,ytrain,ztrain
 
 def modifie_label_Bernoulli_Order(label,proba,nu,S):
+    """renvoie le label attribué par l'annotateur de Bernouilli spécialisé suivant proba, nu, S:
+    label est le vrai label Z (vérité terrain) correspondant à la donnée
+    proba est la paire (spécificité, sensibilité) de l'annotateur s'il utilise sa connaissance
+    nu est sa propension à réagir à la consigne ou à l'ordre (qui dit de voter 1) plutôt qu'à utiliser sa connaissance
+    S est sa propension à aligner son label sur la consigne (vote 1) ou à s'y opposer (vote 0) s'il décide finalement d'y réagir"""
     valeur_proba=np.random.uniform(0,1)
     label_res=label
     l = [nu*S,nu*(1-S),(1-nu)]
@@ -194,9 +188,14 @@ def modifie_label_Bernoulli_Order(label,proba,nu,S):
     return label_res
 
 def generation_Bernoulli_Order(N,T,qualite_annotateur_Bernoulli,noise_truth,nu,S,data_type=0):
-    """retourne en xtrain les données de dimension 2, en ytrain les annotations, en ztrain les vrais labels
-    avec pour qualite_annotateurs une liste contenant les probabilités de succès de chaque annotateur TP,TN
-    noise_truth est le bruit de l'attribution des vrais labels gaussiens sur les données"""
+    """retourne trois matrices :
+    xtrain les N données artificielles de dimension 2 de type data_type générées par gen_arti,
+    ytrain les labels donnés par les T annotateurs de Bernouilli pour chacune des N données
+    ztrain les vrais labels
+    où qualite_annotateurs est une liste contenant pour chaque annotateur de Bernouilli la paire (spécificité, sensibilité) de l'annotateur s'il utilise sa connaissance
+    où nu est une liste contenant pour chaque annotateur de Bernouilli sa propension à réagir à la consigne ou à l'ordre (qui dit de voter 1) plutôt qu'à utiliser sa connaissance
+    où S est une liste contenant pour chaque annotateur de Bernouilli sa propension à aligner son label sur la consigne (vote 1) ou à s'y opposer (vote 0) s'il décide finalement de réagir à la consigne
+    et où noise_truth est toujours le bruit sur l'attribution des vrais labels"""
     xtrain,ztrain = gen_arti(nbex=N,data_type=data_type,epsilon=noise_truth) #vrai labels non bruités
     ztrain=(ztrain+1)/2
     ytrain=np.zeros((N,T)) #changement des labels
@@ -206,9 +205,17 @@ def generation_Bernoulli_Order(N,T,qualite_annotateur_Bernoulli,noise_truth,nu,S
         ytrain[:,t]=annote(ztrain)
     return xtrain,ytrain,ztrain
 
-#III. GENERATION DE X,Y,Z
+#III. GENERATION DE X,Y,Z : FEATURES, ANNOTATIONS, VRAIS LABELS
 
 def genere(N,T,d,modele,qualite_annotateurs,generateur,noise_truth,affiche=False, nu=None, S=None, data_type=0):
+    """genère ensemble d'entrainement Xtrain,Ytrain,Ztrain et ensemble de test Xtest,Ytest,ztest
+    constitués chacun de N données artificielles de dimension d, pour T annotateurs
+    data_type est le type de données artificielles générées avec gen_arti
+    generateur est une fonction indiquant la manière de générer les labels attribués par les T annotateurs
+    qualite_annotateurs, nu et S correspondent aux caractéristiques de ces T annotateurs
+    Si on choisit generateur = "generation_Bernoulli", renseigner qualite_annotateur comme précisé dans la légende de cette fonction
+    Si on choisit generateur = "generation_Bernoulli_xy_depend", renseigner qualite_annotateur comme précisé dans la légende de cette fonction
+    Si on choisit generateur = "generation_Bernoulli_Order", renseigner qualite_annotateur, nu et S comme précisé dans la légende de cette fonction"""
     print("Rappel des paramètres")
     print("Nombre de données générées : ", N)
     print("Nombre de dimensions des données générées : ", d)
@@ -246,7 +253,3 @@ def genere(N,T,d,modele,qualite_annotateurs,generateur,noise_truth,affiche=False
         plt.title("Annotations d'un labelleur")
         plt.show()
     return [xtrain,ytrain,ztrain,xtest,ytest,ztest]
-
-#V. CREE LES CLASSIFIEURS ET APPREND A L'AIDE DU JEU D'ENTRAINEMENT
-#LEARNING FROM CROWD ; MAJORITY VOTING ; CLASSIFIEUR REGLOG
-#RETOURNE LES CLASSIFIEURS ENTRAINES
