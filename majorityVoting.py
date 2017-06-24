@@ -1,5 +1,6 @@
 from importModule import *
 
+#"Classifieur" par jugement majoritaire sur les labels donnés par les divers annotateurs
 
 class MajorityVoting:
     def __init__(self):

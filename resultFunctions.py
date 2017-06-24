@@ -8,9 +8,13 @@ from Classifier1 import *
 from Classifier2 import *
 from Classifier3 import *
 
+#I. CREATION ET APPEL DES APPRENTISSAGES DES CLASSIFIEURS
 
 def create_class_and_learn(xtrain,ytrain,ztrain,classifier=LearnCrowd,draw_convergence=False):
-
+    """Crée les objets classifieurs par CrowdLearning, MajorityVoting et RegLog sur Z,
+    et apprend le classifieur par CrowdLearning sur {xtrain, ytrain} ainsi que le classifieur par RegLog sur {xtrain,ztrain}
+    Note : classifier est le type de classifieur par CrowdLearning choisi (LearnCrowd, LearnCrowd2, LearnCrowdOrder)
+    Retourne les objets classifieurs après apprentissage"""
     (N,d)=np.shape(xtrain)
     (N,T)=np.shape(ytrain)
 
@@ -29,17 +33,7 @@ def create_class_and_learn(xtrain,ytrain,ztrain,classifier=LearnCrowd,draw_conve
 
     return S,M,C
 
-
-#VI. PREDIT LES VRAIS LABELS, DONNE LES SCORES, AFFICHE LES PREDICTIONS POUR LE SEUIL S
-
-#if type_return=0
-#RETOURNE LE GROS VECTEUR DES PREDICTIONS A 6 TERMES (3 CLASSIFIEURS, TRAIN OU TEST) :
-#[predicts_train_LearnCrowd,predicts_train_Majority,predicts_train_RegLog,predicts_test_LearnCrowd,predicts_test_Majority,predicts_test_RegLog]
-
-#if type_return=1
-#RETOURNE LE GROS VECTEUR DES SCORES A 6 TERMES (3 CLASSIFIEURS, TRAIN OU TEST) :
-#[s_train_LearnCrowd,s_train_Majority,s_train_RegLog,s_test_LearnCrowd,s_test_Majority,s_test_RegLog]
-
+#-----------------------
 def giveTrueData(slicing=0.8):
     X,Z = load_XZ('true_data/dataXZ_Adult.txt')
 
@@ -80,14 +74,27 @@ def testTrueData(classifier):
 
     print("Performances sur les données de test : ")
     print("Score en Test : ", S.score(xtest,ztest,0.5))
+#----------------------
+
+#II. APPEL DES FONCTIONS DE PREDICTIONS DES CLASSIFIEURS
 
 def predicts(type_return,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,s,affiche=False):
-    #print("####################################################")
-    #print("Test à l'aide de X")
+    """Fonction de prédiction pour données artificielles 2D
+    S,M,C sont les 3 classifieurs (CrowdLearning, MajorityVoting, Reglog sur Z)
+    où S et C ont été préalablement appris (avant d'être passés en entrée de cette fonction) sur l'ensemble xtrain,ytrain,ztrain
+    s est le seuil utilisé pour donner les prédictions et calculer les scores
+
+    Prédit les labels sur l'ensemble d'apprentissage et sur l'ensemble de test avec les 3 classifieurs,
+    donne les scores à la lumière des vrais labels, affiche les prédictions dans le plan 2D (si affiche=True)
+    #if type_return=0 :
+    #retourne une liste contenant les vecteurs de prédictions des 3 classifieurs sur chacun des deux ensembles (Train/Test) dans l'ordre suivant :
+    #[predicts_train_LearnCrowd,predicts_train_Majority,predicts_train_RegLog,predicts_test_LearnCrowd,predicts_test_Majority,predicts_test_RegLog]
+    #if type_return=1 :
+    #retourne une liste contenant les scores de prédictions des 3 classifieurs sur chacun des deux ensembles (Train/Test) dans l'ordre suivant :
+    #[s_train_LearnCrowd,s_train_Majority,s_train_RegLog,s_test_LearnCrowd,s_test_Majority,s_test_RegLog]"""
 
     s_train_LearnCrowd=S.score(xtrain,ztrain,s)
     predicts_train_LearnCrowd=S.predict(xtrain,s)
-    #plot_frontiere(xtest,S.predict(xtest),step=50) C'est XTEST ? Pas ZTEST ?
     if affiche:
         print("Performances sur les données d'entrainement : ")
         print("Score en Train : ",s_train_LearnCrowd)
@@ -114,7 +121,6 @@ def predicts(type_return,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,s,affiche=
         plt.show()
 
     s_test_LearnCrowd=S.score(xtest,ztest,s)
-    #plot_frontiere(xtest,S.predict(xtest),step=50)
     predicts_test_LearnCrowd=S.predict(xtest,s)
     if affiche:
         print("Performances sur les données de test : ")
@@ -145,10 +151,11 @@ def predicts(type_return,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,s,affiche=
     elif type_return==1:
         return [s_train_LearnCrowd,s_train_Majority,s_train_RegLog,s_test_LearnCrowd,s_test_Majority,s_test_RegLog]
 
-#VI. TRACE DE COURBES ROC EN TRAIN ET TEST POUR LES TROIS CLASSIFIEURS
-#S,M,C DOIVENT ETRE DEJA ENTRAINES SUR LE MEME TRAIN QUE L'INPUT DE LA FONCTION
+#III. POUR TRACES DE COURBES ROC
 
 def TP_FP(predictions,truth):
+    """renvoit le taux de vrai positif et le taux de faux positif pour le vecteur
+    de prédiction 'predictions', et le vecteur des vrais labels 'truth' """
     tmp1 = (predictions==1)&(truth==1);
     TP = np.sum(tmp1==True)/np.sum(truth==1)
     tmp2 = (predictions==1)&(truth==0);
@@ -156,14 +163,15 @@ def TP_FP(predictions,truth):
     return TP,FP
 
 def trace_ROC(S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest):
-    """ trace les courbes ROC pour le modèle learning from the Crowd avec predict(X),
-    compare avec un classifieur sur Z, compare avec un majority voting,
-    place aussi les FP et TP de chaque labelleur // ground truth"""
+    """S,M,C sont les 3 classifieurs (CrowdLearning, MajorityVoting, Reglog sur Z)
+    où S et C ont été préalablement appris (avant d'être passés en entrée de cette fonction) sur l'ensemble xtrain,ytrain,ztrain.
+
+    Pour l'ensemble d'entrainement et pour l'ensemble de test,
+    trace et superpose les courbes ROC des 3 classifieurs (et ajoute les points correspondant aux FP,TP de chaque annotateur)"""
 
     (N,d)=np.shape(xtrain)
     (N,T)=np.shape(ytrain)
 
-    #print("TP et FP de chaque annotateur")
     TP_train_labelleurs=[]
     FP_train_labelleurs=[]
     for t in range(T):
@@ -171,7 +179,6 @@ def trace_ROC(S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest):
         TP_train_labelleurs.append(tp)
         FP_train_labelleurs.append(fp)
 
-    #print("TP et FP de chaque annotateur")
     TP_test_labelleurs=[]
     FP_test_labelleurs=[]
     for t in range(T):
@@ -199,7 +206,6 @@ def trace_ROC(S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest):
     for s in seuils:
         PREDICTS = predicts(0,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,s)
         tp,fp=TP_FP(PREDICTS[0],ztrain)
-        #print(PREDICTS[0],ztrain)
         TP_train_crowd.append(tp)
         FP_train_crowd.append(fp)
         tp,fp=TP_FP(PREDICTS[3],ztest)
@@ -221,29 +227,30 @@ def trace_ROC(S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest):
         FP_test_class.append(fp)
 
     plt.scatter(FP_train_labelleurs,TP_train_labelleurs)
-    plt.plot(FP_train_crowd,TP_train_crowd,color="blue",label="ROC trainset CrowdLearning (Specialized)",marker="o")
+    plt.plot(FP_train_crowd,TP_train_crowd,color="blue",label="ROC trainset CrowdLearning",marker="o")
     plt.plot(FP_train_majority,TP_train_majority,color="red",label="ROC trainset MajorityVoting")
     plt.plot(FP_train_class,TP_train_class,color="yellow",label="ROC trainset  ClassifierTruth")
     plt.legend(bbox_to_anchor=(1, 1.14), loc=1, borderaxespad=0.)
     plt.show()
 
     plt.scatter(FP_test_labelleurs,TP_test_labelleurs)
-    plt.plot(FP_test_crowd,TP_test_crowd,color="blue",label="ROC testset CrowdLearning (Specialized)",marker="o")
+    plt.plot(FP_test_crowd,TP_test_crowd,color="blue",label="ROC testset CrowdLearning",marker="o")
     plt.plot(FP_test_majority,TP_test_majority,color="red",label="ROC testset MajorityVoting")
     plt.plot(FP_test_class,TP_test_class,color="yellow",label="ROC testset ClassifierTruth")
     plt.legend(bbox_to_anchor=(1, 1.14), loc=1, borderaxespad=0.)
     plt.show()
 
 
-def trace_ROC_Unspecialized(S,M,C,S_unsup,xtrain,ytrain,ztrain,xtest,ytest,ztest):
-    """ trace les courbes ROC pour le modèle learning from the Crowd avec predict(X),
-    compare avec un classifieur sur Z, compare avec un majority voting,
-    place aussi les FP et TP de chaque labelleur // ground truth"""
+def trace_ROC_Unspecialized(S,M,C,S_unspe,xtrain,ytrain,ztrain,xtest,ytest,ztest):
+    """S,M,C,S_unspe sont les 4 classifieurs (CrowdLearning Modèle Spécialisé 'LearnCrowd', MajorityVoting, Reglog sur Z, CrowdLearning Modèle Non Spécialisé 'LearnCrowd2')
+    où S,C et S_unspe ont été préalablement appris (avant d'être passés en entrée de cette fonction) sur l'ensemble xtrain,ytrain,ztrain.
+
+    Pour l'ensemble d'entrainement et pour l'ensemble de test,
+    trace et superpose les courbes ROC des 4 classifieurs (et ajoute les points correspondant aux FP,TP de chaque annotateur)"""
 
     (N,d)=np.shape(xtrain)
     (N,T)=np.shape(ytrain)
 
-    #print("TP et FP de chaque annotateur")
     TP_train_labelleurs=[]
     FP_train_labelleurs=[]
     for t in range(T):
@@ -251,7 +258,6 @@ def trace_ROC_Unspecialized(S,M,C,S_unsup,xtrain,ytrain,ztrain,xtest,ytest,ztest
         TP_train_labelleurs.append(tp)
         FP_train_labelleurs.append(fp)
 
-    #print("TP et FP de chaque annotateur")
     TP_test_labelleurs=[]
     FP_test_labelleurs=[]
     for t in range(T):
@@ -266,10 +272,10 @@ def trace_ROC_Unspecialized(S,M,C,S_unsup,xtrain,ytrain,ztrain,xtest,ytest,ztest
     TP_test_crowd=[]
     FP_test_crowd=[]
 
-    TP_train_crowd_unsup=[]
-    FP_train_crowd_unsup=[]
-    TP_test_crowd_unsup=[]
-    FP_test_crowd_unsup=[]
+    TP_train_crowd_unspe=[]
+    FP_train_crowd_unspe=[]
+    TP_test_crowd_unspe=[]
+    FP_test_crowd_unspe=[]
 
     TP_train_majority=[]
     FP_train_majority=[]
@@ -283,11 +289,10 @@ def trace_ROC_Unspecialized(S,M,C,S_unsup,xtrain,ytrain,ztrain,xtest,ytest,ztest
 
     for s in seuils:
         PREDICTS = predicts(0,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,s)
-        s_train_LearnCrowd_unsup=S_unsup.predict(xtrain,s)
-        s_test_LearnCrowd_unsup=S_unsup.predict(xtest,s)
+        s_train_LearnCrowd_unspe=S_unspe.predict(xtrain,s)
+        s_test_LearnCrowd_unspe=S_unspe.predict(xtest,s)
 
         tp,fp=TP_FP(PREDICTS[0],ztrain)
-        #print(PREDICTS[0],ztrain)
         TP_train_crowd.append(tp)
         FP_train_crowd.append(fp)
         tp,fp=TP_FP(PREDICTS[3],ztest)
@@ -308,16 +313,16 @@ def trace_ROC_Unspecialized(S,M,C,S_unsup,xtrain,ytrain,ztrain,xtest,ytest,ztest
         TP_test_class.append(tp)
         FP_test_class.append(fp)
 
-        tp,fp = TP_FP(s_train_LearnCrowd_unsup,ztrain)
-        TP_train_crowd_unsup.append(tp)
-        FP_train_crowd_unsup.append(fp)
-        tp,fp=TP_FP(s_test_LearnCrowd_unsup,ztest)
-        TP_test_crowd_unsup.append(tp)
-        FP_test_crowd_unsup.append(fp)
+        tp,fp = TP_FP(s_train_LearnCrowd_unspe,ztrain)
+        TP_train_crowd_unspe.append(tp)
+        FP_train_crowd_unspe.append(fp)
+        tp,fp=TP_FP(s_test_LearnCrowd_unspe,ztest)
+        TP_test_crowd_unspe.append(tp)
+        FP_test_crowd_unspe.append(fp)
 
     plt.scatter(FP_train_labelleurs,TP_train_labelleurs)
     plt.plot(FP_train_crowd,TP_train_crowd,color="blue",label="ROC trainset CrowdLearning (Specialized)",marker="o")
-    plt.plot(FP_train_crowd_unsup,TP_train_crowd_unsup,color="green",label="ROC trainset CrowdLearning (Unspecialized)",marker="^")
+    plt.plot(FP_train_crowd_unspe,TP_train_crowd_unspe,color="green",label="ROC trainset CrowdLearning (Unspecialized)",marker="^")
     plt.plot(FP_train_majority,TP_train_majority,color="red",label="ROC trainset MajorityVoting")
     plt.plot(FP_train_class,TP_train_class,color="yellow",label="ROC trainset  ClassifierTruth")
     plt.legend(bbox_to_anchor=(1, 1.14), loc=1, borderaxespad=0.)
@@ -325,22 +330,24 @@ def trace_ROC_Unspecialized(S,M,C,S_unsup,xtrain,ytrain,ztrain,xtest,ytest,ztest
 
     plt.scatter(FP_test_labelleurs,TP_test_labelleurs)
     plt.plot(FP_test_crowd,TP_test_crowd,color="blue",label="ROC testset CrowdLearning (Specialized)",marker="o")
-    plt.plot(FP_test_crowd_unsup,TP_test_crowd_unsup,color="green",label="ROC trainset CrowdLearning (Unspecialized)",marker="^")
+    plt.plot(FP_test_crowd_unspe,TP_test_crowd_unspe,color="green",label="ROC trainset CrowdLearning (Unspecialized)",marker="^")
     plt.plot(FP_test_majority,TP_test_majority,color="red",label="ROC testset MajorityVoting")
     plt.plot(FP_test_class,TP_test_class,color="yellow",label="ROC testset ClassifierTruth")
     plt.legend(bbox_to_anchor=(1, 1.14), loc=1, borderaxespad=0.)
     plt.show()
 
-#VII. EXPERIENCES
+#IV. EXPERIENCES (DECRITES DANS LE RAPPORT)
 
-def learn_cas_unif_x(f=create_class_and_learn):
+def qualite_unif_x(f=create_class_and_learn):
+    """Compare les performances d'un modèle de Crowdlearning au MajorityVoting et au classifieur Reglog sur Z
+    pour des annotateurs de Bernouilli non spécialisés (qualité uniforme sur tout l'espace)"""
     N = 100 #nb données
     T = 2 #nb annotateurs
     d = 2 #nb dimension des données : pas modifiable (gen_arti ne génère que des données de dimension 2)
-    noise_truth= 0.65 #bruit sur l'attribution des vrais labels gaussiens sur les données 2D (on pourrait aussi jouer sur ecart-type gaussienne avec sigma)
+    noise_truth= 0.4 #bruit sur l'attribution des vrais labels gaussiens sur les données 2D
     modele= "Bernoulli"
 
-    qualite_annotateurs_Bernoulli=[(0.6, 0.6)]*T #Proba que l'annotateur ait raison
+    qualite_annotateurs_Bernoulli=[(0.6, 0.6)]*T #(Spécificité, sensibilité) de l'annotateur
     #qualite_annotateurs_Bernoulli=[[0.6,0.6],[0.6,0.6],[0.6,0.6],[0.7,0.7],[0.9,0.9]]
     Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth,data_type=1,affiche=True)
 
@@ -355,38 +362,17 @@ def learn_cas_unif_x(f=create_class_and_learn):
     predicts(2,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,0.5,affiche=True)
     trace_ROC(S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest)
 
-def specialisedAnnotators(f=create_class_and_learn):
+def qualite_depend_x(f=create_class_and_learn):
+    """Compare les performances des deux modèles de Crowdlearning (spécialisé et non spécialisé) au MajorityVoting et au classifieur Reglog sur Z
+    pour des annotateurs de Bernouilli spécialisés (qualité différente selon si la donnée vérifie |y|<|x| ou |x|<|y|)"""
     N = 100 #nb données
     T = 2 #nb annotateurs
     d = 2 #nb dimension des données : pas modifiable (gen_arti ne génère que des données de dimension 2)
-    noise_truth= 0.5 #bruit sur l'attribution des vrais labels gaussiens sur les données 2D (on pourrait aussi jouer sur ecart-type gaussienne avec sigma)
-    modele= "Bernoulli"
-    qualite_annotateurs_Bernoulli = [[0.4,0.6],[0.9,0.1]]
-
-    Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth,affiche=True,data_type=1)
-
-    xtrain=Vect[0]
-    ytrain=Vect[1]
-    ztrain=Vect[2]
-    xtest=Vect[3]
-    ytest=Vect[4]
-    ztest=Vect[5]
-    S,M,C = f(xtrain,ytrain,ztrain)
-    SCORES=predicts(1,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,0.5,affiche=True)
-
-    trace_ROC(S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest)
-
-def compareNoneSpecialized(f=create_class_and_learn):
-    N = 100 #nb données
-    T = 4 #nb annotateurs
-    d = 2 #nb dimension des données : pas modifiable (gen_arti ne génère que des données de dimension 2)
-    noise_truth= 0.2 #bruit sur l'attribution des vrais labels gaussiens sur les données 2D (on pourrait aussi jouer sur ecart-type gaussienne avec sigma)
+    noise_truth= 0.4 #bruit sur l'attribution des vrais labels gaussiens sur les données 2D
     modele= "Bernoulli"
 
-    qualite_annotateurs_Bernoulli = [(0.6,0.9),(0.9,0.6)]*int(T/2)
-    # qualite_annotateurs_Bernoulli=[[0.6,0.6],[0.6,0.6],[0.6,0.6],[0.7,0.7],[0.9,0.9]]
-    Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli_xdepend,noise_truth,data_type=3,affiche=False)
-
+    qualite_annotateurs_Bernoulli = [(0.6,0.9),(0.9,0.6)]  #Proba que l'annotateur ait raison dans la zone 1 de données (1-la valeur dans la zone 2)
+    Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli_xy_depend,noise_truth,data_type=3,affiche=False)
 
     xtrain=Vect[0]
     ytrain=Vect[1]
@@ -400,59 +386,55 @@ def compareNoneSpecialized(f=create_class_and_learn):
     plt.show()
 
     plot_data(xtrain,ytrain[:,0])
-    plt.title("Annotations d'un labelleur")
+    plt.title("Annotations du labelleur spécialisé |x|>|y|")
     plt.show()
     plot_data(xtrain,ytrain[:,1])
-    plt.title("Annotations d'un labelleur")
+    plt.title("Annotations du labelleur spécialisé |y|>|x|")
     plt.show()
 
-    S,M,C = f(xtrain,ytrain,ztrain,draw_convergence=False)
+    #Création et apprentissage des classifieurs :
+    #Crowdlearning modèle spécialisé (LearnCrowd), Majority Voting, RegLog sur Z
+    S,M,C = f(xtrain,ytrain,ztrain,draw_convergence=True)
+
+    #Création et apprentissage du classifieur Crowdlearning modèle non spécialisé (LearnCrowd2)
     (N,d)=np.shape(xtrain)
     (N,T)=np.shape(ytrain)
+    S_unspe = LearnCrowd2(T,N,d)
+    S_unspe.fit(xtrain,ytrain,draw_convergence=True)
 
-    # S_now = LearnCrowd(T,N,d)
-    S_now = LearnCrowd2(T,N,d)
-    print("Apprentissage")
-    # S_now.fitNoW(xtrain,ytrain,draw_convergence=True)
-    S_now.fit(xtrain,ytrain,draw_convergence=False)
-    sNoW_train_LearnCrowd=S_now.score(xtrain,ztrain,0.5)
+    '''
+    S_unspe_train_LearnCrowd=S_unspe.score(xtrain,ztrain,0.5)
+    print("Performances sur les données d'entrainement (CrowdLearning non spécialisé) : ")
+    print("Score en Train : ",S_unspe_train_LearnCrowd)
+    S_unspe_test_LearnCrowd=S_unspe.score(xtest,ztest,0.5)
+    print("Performances sur les données de test (CrowdLearning non spécialisé): ")
+    print("Score en Test : ", S_unspe_test_LearnCrowd)
 
-    print("Performances sur les données d'entrainement (non supervisé) : ")
-    print("Score en Train : ",sNoW_train_LearnCrowd)
-    sNoW_test_LearnCrowd=S_now.score(xtest,ztest,0.5)
+    predicts_train_LearnCrowdnow=S_unspe.predict(xtrain,0.5)
+    plot_data(xtrain,predicts_train_LearnCrowdnow)
+    plt.title("Prédictions finales sur le Train après crowdlearning (modèle non specialisé)")
+    plt.show()
+    '''
 
-    print("Performances sur les données de test (non supervisé): ")
-    print("Score en Test : ", sNoW_test_LearnCrowd)
+def qualite_depend_x_evol(f=create_class_and_learn,N_MC=1):
+    """Compare les performances des deux modèles de Crowdlearning (spécialisé et non spécialisé) au MajorityVoting et au classifieur Reglog sur Z
+    pour 2 annotateurs de Bernouilli spécialisés et complémentaires (qualité différente selon si la donnée vérifie |y|<|x| ou |x|<|y|)
+    selon la différence de spécialisation entre les 2 annotateurs dans une même zone (expérience décrite en détails dans le rapport)"""
 
-    predicts_train_LearnCrowdnow=S_now.predict(xtrain,0.5)
-    # plot_data(xtrain,predicts_train_LearnCrowdnow)
-    # plt.title("Prédictions finales sur le Train après crowdlearning (unspecialized)")
-    # plt.show()
-
-
-    predicts_test_LearnCrowdnow=S_now.predict(xtest,0.5)
-    # plot_data(xtrain,predicts_test_LearnCrowdnow)
-    # plt.title("Prédictions finales sur le Test après crowdlearning (unspecialized)")
-    # plt.show()
-
-    predicts(2,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,0.5,affiche=False)
-
-    trace_ROC_Unspecialized(S,M,C,S_now,xtrain,ytrain,ztrain,xtest,ytest,ztest)
-
-def learn_cas_depend_x(f=create_class_and_learn,N_MC=1):
-
-    special_params=np.arange(0.1,0.4,0.05).ravel()
+    special_params=np.arange(0,0.5,0.05).ravel()
     score_train_crowd=[]
+    score_train_crowdun=[]
     score_train_majority=[]
     score_train_reglog=[]
     score_test_crowd=[]
+    score_test_crowdun=[]
     score_test_majority=[]
     score_test_reglog=[]
 
     N = 100 #nb données
     T = 2 #nb annotateurs
     d = 2 #nb dimension des données : pas modifiable (gen_arti ne génère que des données de dimension 2)
-    noise_truth=0.55  #bruit sur l'attribution des vrais labels gaussiens sur les données 2D (on pourrait aussi jouer sur ecart-type gaussienne avec sigma)
+    noise_truth=0.4  #bruit sur l'attribution des vrais labels gaussiens sur les données 2D
     modele= "Bernoulli"
 
     for s in special_params:
@@ -463,9 +445,11 @@ def learn_cas_depend_x(f=create_class_and_learn,N_MC=1):
         stestS = 0
         stestM = 0
         stestC = 0
+        strainSun = 0
+        stestSun = 0
 
         for i in range(N_MC):
-            Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth,affiche=False,data_type=1)
+            Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli_xy_depend,noise_truth,data_type=3,affiche=False)
 
             xtrain=Vect[0]
             ytrain=Vect[1]
@@ -476,7 +460,12 @@ def learn_cas_depend_x(f=create_class_and_learn,N_MC=1):
 
             S,M,C = f(xtrain,ytrain,ztrain)
 
-            SCORES=predicts(1,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,0.5)
+            S_unspe = LearnCrowd2(T,N,d)
+            S_unspe.fit(xtrain,ytrain)
+            S_unspe_train_LearnCrowd=S_unspe.score(xtrain,ztrain,0.5)
+            S_unspe_test_LearnCrowd=S_unspe.score(xtest,ztest,0.5)
+
+            SCORES=predicts(1,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,0.5,affiche=False)
             strainS += SCORES[0]
             strainM += SCORES[1]
             strainC += SCORES[2]
@@ -484,25 +473,35 @@ def learn_cas_depend_x(f=create_class_and_learn,N_MC=1):
             stestM += SCORES[4]
             stestC += SCORES[5]
 
+            strainSun += S_unspe_train_LearnCrowd
+            stestSun += S_unspe_test_LearnCrowd
+
         score_train_crowd.append(strainS)
         score_train_majority.append(strainM)
         score_train_reglog.append(strainC)
         score_test_crowd.append(stestS)
         score_test_majority.append(stestM)
         score_test_reglog.append(stestC)
+        score_train_crowdun.append(strainSun)
+        score_test_crowdun.append(stestSun)
 
-    plt.plot(special_params,score_train_crowd,"blue",label="Score CrowdLearning")
-    plt.plot(special_params,score_train_majority,"red",label="Score MajorityVoting")
-    plt.plot(special_params,score_train_reglog,"yellow",label="Score ClassifierTruth")
+    plt.plot(special_params,score_train_crowd,"blue",label="Score trainset CrowdLearning (spécialisé)")
+    plt.plot(special_params,score_train_majority,"red",label="Score trainset MajorityVoting")
+    plt.plot(special_params,score_train_reglog,"yellow",label="Score trainset ClassifierTruth")
+    plt.plot(special_params,score_train_crowdun,"green",label="Score trainset CrowdLearning (non spécialisé)")
     plt.legend(bbox_to_anchor=(1, 1), loc=1, borderaxespad=0.)
+    plt.xlabel("alpha (|0.5-2*alpha| différence de spécialisation des deux annotateurs dans une même zone)")
     plt.show()
 
-    plt.plot(special_params,score_test_crowd,"blue",label="Score CrowdLearning")
-    plt.plot(special_params,score_test_majority,"red",label="Score MajorityVoting")
-    plt.plot(special_params,score_test_reglog,"yellow",label="Score ClassifierTruth")
+    plt.plot(special_params,score_test_crowd,"blue",label="Score testset CrowdLearning (spécialisé)")
+    plt.plot(special_params,score_test_majority,"red",label="Score testset MajorityVoting")
+    plt.plot(special_params,score_test_reglog,"yellow",label="Score testset ClassifierTruth")
+    plt.plot(special_params,score_test_crowdun,"green",label="Score testset CrowdLearning (non spécialisé)")
     plt.legend(bbox_to_anchor=(1, 1), loc=1, borderaxespad=0.)
+    plt.xlabel("alpha (|0.5-2*alpha| différence de spécialisation des deux annotateurs dans une même zone)")
     plt.show()
 
+#------------------------------------------------------------
 
 def drawScoreQuality(s, f=create_class_and_learn, classifier=LearnCrowd, N_MC=1):
     N = 100 #nb données
@@ -708,7 +707,6 @@ def learn_cas_depend_Order(f=create_class_and_learn):
     modele= "Bernoulli"
 
     qualite_annotateurs_Bernoulli = [(0.6, 0.6)]*T #Proba que l'annotateur ait raison
-    #qualite_annotateurs_Bernoulli=[[0.6,0.6],[0.6,0.6],[0.6,0.6],[0.7,0.7],[0.9,0.9]]
     nu = [0]*int(T/3)+[1]*int(T/3)+[1]*int(T/3)
     S = [np.random.rand()]*int(T/3)+[1]*int(T/3)+[0]*int(T/3)
     Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli_Order,noise_truth,nu=nu,S=S,data_type=1,affiche=True)
@@ -720,12 +718,12 @@ def learn_cas_depend_Order(f=create_class_and_learn):
     ytest=Vect[4]
     ztest=Vect[5]
     S,M,C = f(xtrain,ytrain,ztrain,classifier=LearnCrowdOrder,draw_convergence=True)
-    S_now = LearnCrowd2(T,N,d)
-    S_now.fit(xtrain,ytrain)
+    S_unspe = LearnCrowd2(T,N,d)
+    S_unspe.fit(xtrain,ytrain)
 
     predicts(2,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,0.5,affiche=True)
 
-    trace_ROC_Unspecialized(S,M,C,S_now,xtrain,ytrain,ztrain,xtest,ytest,ztest)
+    trace_ROC_Unspecialized(S,M,C,S_unspe,xtrain,ytrain,ztrain,xtest,ytest,ztest)
 
 ####################################
 # TRACES DONNEES REELLES
@@ -821,11 +819,11 @@ def traceTrueData(classifier1=LearnCrowd, classifier2=LearnCrowd2):
     S = classifier1(T,N,d,0.01)
     M = MajorityVoting()
     C = Classifier_RegLog()
-    S_now = classifier2(T,N,d)
+    S_unspe = classifier2(T,N,d)
 
     S.fit(xtrain, ytrain, max_iter=60,draw_convergence=True)
     C.fit(xtrain,ztrain,0.01,1000,affiche=False)
-    S_now.fit(xtrain, ytrain,draw_convergence=True)
+    S_unspe.fit(xtrain, ytrain,draw_convergence=True)
 
     # predicts(2,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,0.5,affiche=False)
-    trace_ROC_Unspecialized(S,M,C,S_now,xtrain,ytrain,ztrain,xtest,ytest,ztest)
+    trace_ROC_Unspecialized(S,M,C,S_unspe,xtrain,ytrain,ztrain,xtest,ytest,ztest)

@@ -1,7 +1,6 @@
 from importModule import *
 
-
-#POUT REGRESSION LOGISTIQUE SUR LA GROUND TRUTH
+#Classifieur par régression logistique à apprendre directement sur les vrais labels Z
 
 def optimize(fonc,dfonc,xinit,eps,max_iter):
     x_histo=[]
