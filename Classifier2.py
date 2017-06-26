@@ -73,6 +73,8 @@ class LearnCrowd2:
         self.y_trouve=np.zeros((N,1))
         #lambda de ridge regression
         self.lb = l
+        #ne sert a rien ici sauf pour faire marcher les fonctions
+        self.gamma="rien"
         
 
     def likelihood(self, X, Y, alpha, beta, w, vrai_y):

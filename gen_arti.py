@@ -232,18 +232,6 @@ def genere(N,T,d,modele,qualite_annotateurs,generateur,noise_truth,affiche=False
         xtrain, ytrain,ztrain = generateur(N,T,qualite_annotateurs,noise_truth,nu=nu,S=S,data_type=data_type)
         xtest, ytest,ztest = generateur(N,T,qualite_annotateurs,noise_truth,nu=nu,S=S,data_type=data_type)
 
-    #print("Données d'entrainement")
-    #print("Données X : ", xtrain)
-    #print("Vrai Labels : ", ztrain)
-    #print("Labels données par les annotateurs Y : ", ytrain)
-    #print("")
-    #print("ytrain size :", ytrain.shape)
-    #print("xtrain size :", xtrain.shape)
-    #print("Données de test")
-    #print("Données X : ", xtest)
-    #print("Vrai Labels : ", ztest)
-    #print("Labels données par les annotateurs Y : ", ytest)
-    #print("")
 
     if affiche:
         plot_data(xtrain,ztrain)

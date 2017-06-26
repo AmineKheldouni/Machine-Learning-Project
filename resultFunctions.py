@@ -585,7 +585,6 @@ def drawScoreAnnotateurs(s, f=create_class_and_learn, classifier=LearnCrowd, N_M
 
     for T in list_T:
         qualite_annotateurs_Bernoulli=[(0.6, 0.6)]*T #Proba que l'annotateur ait raison
-        #qualite_annotateurs_Bernoulli=[[0.6,0.6],[0.6,0.6],[0.6,0.6],[0.7,0.7],[0.9,0.9]]
         scoreStrain = 0
         scoreMtrain = 0
         scoreCtrain = 0
@@ -738,21 +737,17 @@ def regularisation(classifier):
     error_train=[]
     error_test=[]
     M = MajorityVoting()
-    # strain_majority=M.score(ytrain,ztrain,0.5)
-    # stest_majority= M.score(ytest,ztest,0.5)
     for l in lbd:
         S = classifier(T,N,d,l)
         S.fit(xtrain,ytrain,max_iter=100)
         results = []
         results.append(S.score(xtrain,ztrain,0.5))
-        # results.append(M.score(xtrain,ztrain,0.5))
         results.append(S.score(xtest,ztest,0.5))
         results.append(S.score(xtest,ztest,0.5))
         error_train.append(results[0])
         error_test.append(results[2])
 
     plt.plot(list(range(-7,7)),error_train,color="blue")
-    # pailt.plot(list(range(-7,7)),error_test,color="red")
     plt.xlabel("Paramètre de régularisation")
     plt.ylabel("Scores")
     plt.title("Scores d'entrainement (bleu) et de test (rouge) \n en fonction du paramètre de régularisation")
