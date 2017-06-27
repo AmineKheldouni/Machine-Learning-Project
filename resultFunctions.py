@@ -338,7 +338,7 @@ def trace_ROC_Unspecialized(S,M,C,S_unspe,xtrain,ytrain,ztrain,xtest,ytest,ztest
 
 #IV. EXPERIENCES (DECRITES DANS LE RAPPORT)
 
-def qualite_unif_x(f=create_class_and_learn):
+def qualite_unif_x(f=create_class_and_learn,classifier=LearnCrowd):
     """Compare les performances d'un modèle de Crowdlearning au MajorityVoting et au classifieur Reglog sur Z
     pour des annotateurs de Bernouilli non spécialisés (qualité uniforme sur tout l'espace)"""
     N = 100 #nb données
@@ -357,7 +357,7 @@ def qualite_unif_x(f=create_class_and_learn):
     xtest=Vect[3]
     ytest=Vect[4]
     ztest=Vect[5]
-    S,M,C = f(xtrain,ytrain,ztrain,draw_convergence=True)
+    S,M,C = f(xtrain,ytrain,ztrain,classifier=classifier,draw_convergence=True)
 
     predicts(2,S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest,0.5,affiche=True)
     trace_ROC(S,M,C,xtrain,ytrain,ztrain,xtest,ytest,ztest)
@@ -394,27 +394,13 @@ def qualite_depend_x(f=create_class_and_learn):
 
     #Création et apprentissage des classifieurs :
     #Crowdlearning modèle spécialisé (LearnCrowd), Majority Voting, RegLog sur Z
-    S,M,C = f(xtrain,ytrain,ztrain,draw_convergence=True)
+    S,M,C = f(xtrain,ytrain,ztrain,classifier=LearnCrowd,draw_convergence=True)
 
     #Création et apprentissage du classifieur Crowdlearning modèle non spécialisé (LearnCrowd2)
     (N,d)=np.shape(xtrain)
     (N,T)=np.shape(ytrain)
     S_unspe = LearnCrowd2(T,N,d)
     S_unspe.fit(xtrain,ytrain,draw_convergence=True)
-
-    '''
-    S_unspe_train_LearnCrowd=S_unspe.score(xtrain,ztrain,0.5)
-    print("Performances sur les données d'entrainement (CrowdLearning non spécialisé) : ")
-    print("Score en Train : ",S_unspe_train_LearnCrowd)
-    S_unspe_test_LearnCrowd=S_unspe.score(xtest,ztest,0.5)
-    print("Performances sur les données de test (CrowdLearning non spécialisé): ")
-    print("Score en Test : ", S_unspe_test_LearnCrowd)
-
-    predicts_train_LearnCrowdnow=S_unspe.predict(xtrain,0.5)
-    plot_data(xtrain,predicts_train_LearnCrowdnow)
-    plt.title("Prédictions finales sur le Train après crowdlearning (modèle non specialisé)")
-    plt.show()
-    '''
 
 def qualite_depend_x_evol(f=create_class_and_learn,N_MC=1):
     """Compare les performances des deux modèles de Crowdlearning (spécialisé et non spécialisé) au MajorityVoting et au classifieur Reglog sur Z
@@ -458,7 +444,7 @@ def qualite_depend_x_evol(f=create_class_and_learn,N_MC=1):
             ytest=Vect[4]
             ztest=Vect[5]
 
-            S,M,C = f(xtrain,ytrain,ztrain)
+            S,M,C = f(xtrain,ytrain,ztrain,classifier=LearnCrowd)
 
             S_unspe = LearnCrowd2(T,N,d)
             S_unspe.fit(xtrain,ytrain)
@@ -528,7 +514,7 @@ def drawScoreQuality(s, f=create_class_and_learn, classifier=LearnCrowd, N_MC=1)
         scoreMtest = 0
         scoreCtest = 0
         for i in range(N_MC):
-            Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth,data_type=1)
+            Vect=genere(N,T,d,modele,qualite_annotateurs_Bernoulli,generation_Bernoulli,noise_truth,data_type=0)
             xtrain=Vect[0]
             ytrain=Vect[1]
             ztrain=Vect[2]

@@ -1,43 +1,32 @@
 # Modules importés
 
-
-
 from resultFunctions import *
 
-
-# N = 10
-# T = 5
-# d = 2
-# noise_truth=0.05
-# modele= "Bernoulli"
-# qualite_annoteur = [(0.6,0.6)]*T
-
-# Test donnĂŠes artificielles :
-
-#LearnfromtheCrowd2(N,T,d,modele,qualite_annoteur,generation_Bernouilli,noise_truth)
-
-#qualite_unif_x(create_class_and_learn)
-#changer l'argument par defaut de create _class dans resultFonctions pour avoir les courbes des autres modeles
-
-# Courbe (a) sharelatex :
-#
-#drawScoreQuality(0.5,N_MC=1)
-#drawScoreAnnotateurs(0.5,N_MC=5)
-# drawScorePropExperts(0.5,2,N_MC=5)
-
-# specialisedAnnotators()
-
+# ------------------------------------------------------------
+# Donnees artificielles
 
 #exp1
-# compareNoneSpecialized()
+# qualite_unif_x(classifier=LearnCrowd2)
 
 #exp2
-# qualite_depend_x(N_MC=1)
+# drawScoreQuality(0.5,classifier=LearnCrowd2,N_MC=1)
 
 #exp3
+# drawScoreAnnotateurs(0.5,classifier=LearnCrowd2,N_MC=5)
+
+#exp4
+# qualite_depend_x()
+
+#exp5
+# qualite_depend_x_evol()
+
+# ------------------------------------------------------------
+# Donnees réelles
+
 # traceTrueData()
 # nb_donnees()
 # regularisation(LearnCrowd)
 
-#exp4
+# ------------------------------------------------------------
+# Modèle "dépendant"
 # learn_cas_depend_Order()
